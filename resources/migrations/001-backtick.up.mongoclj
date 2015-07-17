@@ -1,0 +1,10 @@
+;; -*- clojure -*-
+
+(require
+ '[backtick.core :refer [master-cf]]
+ '[clams.conf :as conf]
+ '[monger.collection :as mc])
+
+;; Add the index
+(def index-name (str (:coll master-cf) "_state_index"))
+(mc/ensure-index (:db master-cf) (:coll master-cf) {:state 1} {:name index-name})
