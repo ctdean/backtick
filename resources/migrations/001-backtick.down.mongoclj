@@ -5,6 +5,12 @@
  '[clams.conf :as conf]
  '[monger.collection :as mc])
 
-;; Remove the index
-(def index-name (str (:coll master-cf) "_state_index"))
-(mc/drop-index (:db master-cf) (:coll master-cf) index-name)
+;; Remove the main indexes
+(let [index-name (str (:coll master-cf) "_state_index")]
+  (mc/drop-index (:db master-cf) (:coll master-cf) index-name))
+(let [index-name (str (:coll master-cf) "_worker_index")]
+  (mc/drop-index (:db master-cf) (:coll master-cf) index-name))
+
+;; Remove the cron indexes
+(let [index-name (str (:cron master-cf) "_worker_index")]
+  (mc/drop-index (:db master-cf) (:cron master-cf) index-name))

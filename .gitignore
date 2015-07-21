@@ -2,6 +2,7 @@
 *.jar
 /.lein-*
 /.nrepl-port
+/app.log
 /checkouts
 /classes
 /st.com.bind

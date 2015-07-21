@@ -5,6 +5,13 @@
  '[clams.conf :as conf]
  '[monger.collection :as mc])
 
-;; Add the index
-(def index-name (str (:coll master-cf) "_state_index"))
-(mc/ensure-index (:db master-cf) (:coll master-cf) {:state 1} {:name index-name})
+;; Add the main indexes
+(let [index-name (str (:coll master-cf) "_state_index")]
+  (mc/ensure-index (:db master-cf) (:coll master-cf) {:state 1} {:name index-name}))
+(let [index-name (str (:coll master-cf) "_worker_index")]
+  (mc/ensure-index (:db master-cf) (:coll master-cf) {:worker 1} {:unique true
+                                                                  :worker index-name}))
+;; Add the cron indexes
+(let [index-name (str (:cron master-cf) "_worker_index")]
+  (mc/ensure-index (:db master-cf) (:cron master-cf) {:worker 1} {:unique true
+                                                                  :worker index-name}))
