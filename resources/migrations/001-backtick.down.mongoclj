@@ -8,7 +8,9 @@
 ;; Remove the main indexes
 (let [index-name (str (:coll master-cf) "_state_index")]
   (mc/drop-index (:db master-cf) (:coll master-cf) index-name))
-(let [index-name (str (:coll master-cf) "_worker_index")]
+(let [index-name (str (:coll master-cf) "_pri_index")]
+  (mc/drop-index (:db master-cf) (:coll master-cf) index-name))
+(let [index-name (str (:coll master-cf) "_finished_index")]
   (mc/drop-index (:db master-cf) (:coll master-cf) index-name))
 
 ;; Remove the cron indexes
