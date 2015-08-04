@@ -34,7 +34,7 @@
             :cron-window-ms     (conf/get :bt-cron-window-ms    1000)
             :max-tries          (conf/get :bt-max-tries         16)
             }
-        mongo-cnx (mg/connect-via-uri (:mongo-url cf))
+        mongo-cnx (when-let [u (:mongo-url cf)] (mg/connect-via-uri u))
         conn (:conn mongo-cnx)
         db (:db mongo-cnx)]
     (assoc cf :db db)))
@@ -63,7 +63,10 @@
   (let [{worker :worker data :data} msg
         f (@workers worker)]
     (if f
-        (.submit pool (fn [] (try (apply f data) (finally (>!! ch :done)))))
+        (.submit pool (fn [] (try
+                               (apply f data)
+                               (finally
+                                 (>!! ch :done)))))
         (do
           (log/errorf "No worker %s registered, discarding job" worker)
           (>!! ch :done)
@@ -72,8 +75,12 @@
 (defn register [name f]
   (swap! workers assoc name f))
 
+(defn registered-workers []
+  @workers)
+
 (defn register-cron
-  "Register or re-register a scheduled job."
+  "Register or re-register a scheduled job.  The job is started for te
+   first time interval ms from now."
   [name interval f]
   (register name (fn [_] (f)))
   ;; There are three cases here:
@@ -81,24 +88,30 @@
   ;;  2.  An existing job, with a new interval => Change the next and
   ;;      interval fields.
   ;;  3.  A existing job, with the same interval => Do nothing
-  (let [t (time/now)]
+  (let [next (time/plus (time/now) (time/millis interval))]
     (when (not (mc/find-and-modify (:db master-cf)  ; Change the interval if needed
                                    (:cron master-cf)
                                    {:worker name :interval {$ne interval}}
-                                   {$set {:next t :interval interval}}
+                                   {$set {:next next :interval interval}}
                                    {:new true}))
       (mc/find-and-modify (:db master-cf) ; Insert new job if needed
                           (:cron master-cf)
                           {:worker name}
-                          {$setOnInsert {:worker name :next t :interval interval}}
+                          {$setOnInsert {:worker name :next next :interval interval}}
                           {:upsert true}))))
 
-(defn perform [name args]
-  (if (not (@workers name))
-      (log/errorf "No worker %s registered, not queuing job" name)
-      (mc/insert (:db master-cf)
-                 (:coll master-cf)
-                 {:worker name :pri (time/now) :state "queued" :data args})))
+(defn registered-crons []
+  (iter (foreach cron (mc/find-maps (:db master-cf) (:cron master-cf)))
+        (collect-map (:worker cron) cron)))
+
+(defn perform
+  ([name] (perform name nil))
+  ([name args]
+   (if (not (@workers name))
+       (log/errorf "No worker %s registered, not queuing job" name)
+       (mc/insert (:db master-cf)
+                  (:coll master-cf)
+                  {:worker name :pri (time/now) :state "queued" :data args}))))
 
 ;;;
 ;;; job
@@ -217,7 +230,9 @@
   (assert (= args []) "Cron function takes no arguments")
   (let [nm (str *ns* "/" name)]
     `(do
-       (register-cron ~nm ~interval-ms (fn ~args ~@body)))))
+       (register-cron ~nm ~interval-ms (fn ~args ~@body))
+       (defn ~name []
+         (perform ~nm)))))
 
 ;;;
 ;;; Cleaners

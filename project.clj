@@ -9,4 +9,11 @@
      [org.clojure/core.async "0.1.346.0-17112a-alpha"]
      [org.clojure/tools.logging "0.3.1"]
      [org.slf4j/slf4j-log4j12 "1.7.7"]
-     ])
+     ]
+    :plugins [
+              [com.jakemccrary/lein-test-refresh "0.10.0"]
+              ]
+    :profiles {
+               :test {:jvm-opts ["-Dclams.env=test"]}
+               :production {:jvm-opts ["-Dclams.env=production"]}
+               })
