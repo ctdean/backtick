@@ -2,7 +2,6 @@
 
 (require
  '[backtick.core :refer [master-cf]]
- '[clams.conf :as conf]
  '[monger.collection :as mc])
 
 ;; Add the main indexes
@@ -12,8 +11,12 @@
   (mc/ensure-index (:db master-cf) (:coll master-cf) {:pri 1} {:name index-name}))
 (let [index-name (str (:coll master-cf) "_finished_index")]
   (mc/ensure-index (:db master-cf) (:coll master-cf) {:finished 1} {:name index-name}))
+(let [index-name (str (:coll master-cf) "_pop_index")]
+  (mc/ensure-index (:db master-cf) (:coll master-cf) {:state 1 :pri 1} {:name index-name}))
 
 ;; Add the cron indexes
 (let [index-name (str (:cron master-cf) "_worker_index")]
   (mc/ensure-index (:db master-cf) (:cron master-cf) {:worker 1} {:unique true
                                                                   :name index-name}))
+(let [index-name (str (:cron master-cf) "_next_index")]
+  (mc/ensure-index (:db master-cf) (:cron master-cf) {:next 1} {:name index-name}))

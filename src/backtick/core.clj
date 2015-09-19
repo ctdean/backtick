@@ -7,7 +7,6 @@
    [clojure.core.async :as async :refer [chan alts! alts!!
                                          <!! >!! <! >! close!
                                          go go-loop timeout]]
-   [clojure.pprint :as pprint]
    [clojure.tools.logging :as log]
    [iter.core :refer [iter iter*]]
    [monger.collection :as mc]
@@ -58,22 +57,30 @@
                               name
                               (swap! thread-counter inc)))))))
 
+(def ^:private job-counter (atom 0))
+
 (defn- submit-worker [pool ch msg]
-  (log/infof "Running job")
-  (let [{worker :worker data :data} msg
-        f (@workers worker)]
-    (if f
-        (.submit pool (fn [] (try
-                               (apply f data)
-                               (finally
-                                 (>!! ch :done)))))
-        (do
-          (log/errorf "No worker %s registered, discarding job" worker)
-          (>!! ch :done)
-          nil))))
+  (let [n (swap! job-counter inc)]
+    (log/infof "Running job %s ..." n)
+    (let [{worker :worker data :data} msg
+          f (@workers worker)]
+      (if f
+          (.submit pool (fn [] (try
+                                 (apply f data)
+                                 (finally
+                                   (log/infof "Running job %s ... done" n)
+                                   (>!! ch :done)
+                                   (log/infof "Running job %s ... done sent" n)))))
+          (do
+            (log/errorf "No worker %s registered, discarding job" worker)
+            (>!! ch :done)
+            nil)))))
 
 (defn register [name f]
   (swap! workers assoc name f))
+
+(defn unregister [name]
+  (swap! workers dissoc name))
 
 (defn registered-workers []
   @workers)
@@ -121,6 +128,7 @@
   (log/infof "run-jobs")
   (iter* (foreach job (range pool-size))
          (go-loop []
+           (log/infof "loop start")
            (let [msg (<! job-ch)]
              (case msg
                :ping (do
@@ -130,6 +138,7 @@
                (let [done-ch (chan 1)
                      worker (submit-worker pool done-ch msg)]
                  (let [[done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
+                   (log/infof "Job success %s" done?)
                    (if done?
                        (mc/find-and-modify (:db master-cf)
                                            (:coll master-cf)
@@ -188,17 +197,26 @@
               nil)))
       (pop-payload)))
 
+;;; Run the master work queue.  This function never returns in normal
+;;; operation.
+
+(def ^:private keep-running-queue? (atom false))
+
 (defn- run-queue [pool-size job-ch]
   (try
-    (iter* (times)
-           (>!! job-ch :ping)           ; Find available job runner
-           (iter* (times)
-                  (with payload (pop-queue)) ; Pop from the queue
-                  (if (not payload)     ; Sleep if queue is empty
-                      (Thread/sleep (:poll-ms master-cf))
-                      (do               ; Send the job to be processed
-                        (>!! job-ch (select-keys payload [:data :worker :_id]))
-                        (break)))))
+    (iter* (forever)
+           (log/debug "run-queue loop")
+           (while @keep-running-queue?)
+           ;; Find available job runner
+           (when-let [sent? (first (alts!! [[job-ch :ping] (timeout 1000)]))]
+             (iter* (forever)
+                    (while @keep-running-queue?)
+                    (let [payload (pop-queue)] ; Pop from the queue
+                      (if (not payload)        ; Sleep if queue is empty
+                          (Thread/sleep (:poll-ms master-cf))
+                          (do                ; Send the job to be processed
+                            (>!! job-ch (select-keys payload [:data :worker :_id]))
+                            (break)))))))
     (finally
       (iter* (times pool-size)
              (>!! job-ch :stop)))))
@@ -208,12 +226,18 @@
 ;;;
 
 (defn run [pool-size]
-  (let [pool (Executors/newFixedThreadPool pool-size (make-thread-factory))
-        job-ch (chan)]
-    (start-jobs pool pool-size job-ch)
-    (run-queue pool-size job-ch)
-    (.shutdown pool)
-    (log/infof "Shutdown complete")))
+  (if (not (compare-and-set! keep-running-queue? false true))
+      (log/infof "Backlog already running")
+      (future
+        (let [pool (Executors/newFixedThreadPool pool-size (make-thread-factory))
+              job-ch (chan)]
+          (start-jobs pool pool-size job-ch)
+          (run-queue pool-size job-ch)
+          (.shutdown pool)
+          (log/infof "Shutdown complete")))))
+
+(defn shutdown []
+  (compare-and-set! keep-running-queue? true false))
 
 ;;;
 ;;; Helpers

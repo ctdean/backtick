@@ -1,4 +1,4 @@
-(ns backtick.core-test
+(ns backtick.test.core-test
   (:require
    [clojure.test :refer :all]
    [backtick.core :refer :all]))
