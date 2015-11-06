@@ -8,16 +8,23 @@ all: run
 run:
 	lein trampoline run
 
+# Create the tables
+init:
+	createuser -s postgres -h localhost || exit 0
+	createdb -Upostgres -h localhost api
+	createdb -Upostgres -h localhost api_test
+
 # Drop the tables
 drop:
-	mongo backtick --eval 'db.dropDatabase()'
-	mongo backtick_test --eval 'db.dropDatabase()'
+	dropdb -Upostgres -h localhost api      || exit 0
+	dropdb -Upostgres -h localhost api_test || exit 0
 
 migrate:
-	lein run -m clams.migrate migrate
+	DATABASE_URL="jdbc:postgresql://localhost:5432/api?user=postgres" \
+	    lein run -m clams.migrate migrate
 
 # Nuke the existing databases and recreate
-rebuild: drop 
+rebuild: drop init migrate
 
 test:
 	lein test
@@ -26,3 +33,4 @@ test:
 test_refresh:
 	lein with-profile +test trampoline test-refresh
 
+.PHONY: test

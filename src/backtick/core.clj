@@ -2,47 +2,61 @@
   "@ctdean"
   (:require
    [clams.conf :as conf]
-   [clj-time.coerce :as coerce]
+   [clj-time.coerce :refer [to-sql-time]]
    [clj-time.core :as time]
    [clojure.core.async :as async :refer [chan alts! alts!!
                                          <!! >!! <! >! close!
                                          go go-loop timeout]]
    [clojure.tools.logging :as log]
+   [jdbc.pool.c3p0 :as pool]
    [iter.core :refer [iter iter*]]
-   [monger.collection :as mc]
-   [monger.core :as mg]
-   monger.joda-time
-   [monger.operators :refer [$set $setOnInsert $inc $lt $ne $gt]]
+   [yesql.core :refer [defqueries]]
    )
-  (:import (java.util.concurrent Executors TimeUnit)))
+  (:import (java.util.concurrent Executors TimeUnit))
+  (:gen-class))
 
 ;;;
 ;;; config
 ;;;
 
-(defn load-config []
-  (let [cf {:mongo-url          (conf/get :bt-mongo-url)
-            :coll               (conf/get :bt-coll              "bt_queue")
-            :cron               (conf/get :bt-cron              "bt_cron")
+(defn- load-config []
+  (let [cf {:db-url             (conf/get :bt-database-url)
             :poll-ms            (conf/get :bt-poll-ms           1000)
             :cron-ms            (conf/get :bt-cron-ms           (* 60 1000))
             :timeout-ms         (conf/get :bt-timeout-ms        5000)
             :revive-check-ms    (conf/get :bt-revive-check-ms   (* 5 60 1000))
             :remove-check-ms    (conf/get :bt-remove-check-ms   (* 60 60 1000))
-            :max-completed-ms   (conf/get :bt-max-completed-ms  (* 24 60 60 1000))
+            :max-completed-ms   (conf/get :bt-max-completed-ms  (* 7 24 60 60 1000))
             :cron-window-ms     (conf/get :bt-cron-window-ms    1000)
             :max-tries          (conf/get :bt-max-tries         16)
-            }
-        mongo-cnx (when-let [u (:mongo-url cf)] (mg/connect-via-uri u))
-        conn (:conn mongo-cnx)
-        db (:db mongo-cnx)]
-    (assoc cf :db db)))
+            }]
+    cf))
 
-(def master-cf (load-config))
+(def ^:private master-cf (load-config))
+
+;; Convert a Heroku jdbc URL
+(defn- format-jdbc-url [url]
+  (let [u (clojure.string/replace url
+                                  #"^postgres\w*://([^:]+):([^:]+)@(.*)"
+                                  "jdbc:postgresql://$3?user=$1&password=$2")]
+    (if (re-find #"[?]" u)
+        u
+        (str u "?_ignore=_ignore"))))
+
+(def spec
+  (pool/make-datasource-spec
+   {:connection-uri (format-jdbc-url (:db-url master-cf))}))
+
+(defqueries "sql/backtick.sql"
+  {:connection spec})
+
 
 ;;;
 ;;; Workers
 ;;;
+
+(defn- now []
+  (to-sql-time (time/now)))
 
 (def ^:private workers (atom {}))
 
@@ -62,8 +76,8 @@
 (defn- submit-worker [pool ch msg]
   (let [n (swap! job-counter inc)]
     (log/infof "Running job %s ..." n)
-    (let [{worker :worker data :data} msg
-          f (@workers worker)]
+    (let [{name :name data :data} msg
+          f (@workers name)]
       (if f
           (.submit pool (fn [] (try
                                  (apply f data)
@@ -72,7 +86,7 @@
                                    (>!! ch :done)
                                    (log/infof "Running job %s ... done sent" n)))))
           (do
-            (log/errorf "No worker %s registered, discarding job" worker)
+            (log/errorf "No worker %s registered, discarding job" name)
             (>!! ch :done)
             nil)))))
 
@@ -86,39 +100,24 @@
   @workers)
 
 (defn register-cron
-  "Register or re-register a scheduled job.  The job is started for te
+  "Register or re-register a scheduled job.  The job is started for the
    first time interval ms from now."
   [name interval f]
   (register name (fn [_] (f)))
-  ;; There are three cases here:
-  ;;  1.  A new job => We should insert it into the DB
-  ;;  2.  An existing job, with a new interval => Change the next and
-  ;;      interval fields.
-  ;;  3.  A existing job, with the same interval => Do nothing
-  (let [next (time/plus (time/now) (time/millis interval))]
-    (when (not (mc/find-and-modify (:db master-cf)  ; Change the interval if needed
-                                   (:cron master-cf)
-                                   {:worker name :interval {$ne interval}}
-                                   {$set {:next next :interval interval}}
-                                   {:new true}))
-      (mc/find-and-modify (:db master-cf) ; Insert new job if needed
-                          (:cron master-cf)
-                          {:worker name}
-                          {$setOnInsert {:worker name :next next :interval interval}}
-                          {:upsert true}))))
+  (let [next (to-sql-time (time/plus (time/now) (time/millis interval)))]
+    (clojure.pprint/cl-format true "--- ~s\n"  {:name name :interval interval :next next})
+    (cron-upsert-interval {:name name :interval (int interval) :next next})))
 
 (defn registered-crons []
-  (iter (foreach cron (mc/find-maps (:db master-cf) (:cron master-cf)))
-        (collect-map (:worker cron) cron)))
+  (iter (foreach cron (cron-all))
+        (collect-map (:name cron) cron)))
 
 (defn perform
   ([name] (perform name nil))
   ([name args]
    (if (not (@workers name))
        (log/errorf "No worker %s registered, not queuing job" name)
-       (mc/insert (:db master-cf)
-                  (:coll master-cf)
-                  {:worker name :pri (time/now) :state "queued" :data args}))))
+       (queue-insert! {:name name :priority (now) :state "queued" :data args}))))
 
 ;;;
 ;;; job
@@ -140,14 +139,11 @@
                  (let [[done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
                    (log/infof "Job success %s" done?)
                    (if done?
-                       (mc/find-and-modify (:db master-cf)
-                                           (:coll master-cf)
-                                           {:_id (:_id msg) :state "running"}
-                                           {$set {:state "done" :finished (time/now)}})
+                       (queue-finish! (:id msg))
                        (do
                          (when worker
                            (.cancel worker true))
-                         (log/infof "job %s timeout: %s" job (:worker msg)))))
+                         (log/infof "job %s timeout: %s" job (:name msg)))))
                  (recur)))))))
 
 ;;;
@@ -157,35 +153,24 @@
 (def ^:private cron-checked (atom 0))
 
 (defn- pop-payload []
-  (mc/find-and-modify (:db master-cf)
-                      (:coll master-cf)
-                      {:state "queued"}
-                      {$set {:state "running" :started (time/now)}
-                       $inc {:tries 1}}
-                      {:sort {:pri 1}}))
+  (queue-pop))
 
+;; Not fault tolerant
 (defn- pop-cron []
   (let [now (time/now)
-        window (time/plus now (time/millis (:cron-window-ms master-cf)))]
-    (when-let [payload (mc/find-and-modify (:db master-cf)
-                                           (:cron master-cf)
-                                           {:next {$lt now}}
-                                           {$set {:next window}}
-                                           {})]
+        window (to-sql-time (time/plus now (time/millis (:cron-window-ms master-cf))))]
+    (when-let [payload (first (cron-next {:now (to-sql-time now) :next window}))]
       (if (not (@workers (:name payload)))
           (do
             (log/warnf "No cron worker %s registered, removing job" (:name payload))
-            (mc/remove (:db master-cf) (:cron master-cf) {:_id (:_id payload)})
+            (cron-delete payload)
             (pop-cron))
-          (let [next (time/plus (:next payload) (time/millis (:interval payload)))]
-            (mc/insert (:db master-cf)
-                       (:coll master-cf)
-                       (assoc payload :state "running" :started (time/now) :tries 1))
-            (mc/find-and-modify (:db master-cf)
-                                (:cron master-cf)
-                                {:_id (:_id payload)}
-                                {$set {:next next}}
-                                {})
+          (let [next (to-sql-time (time/plus (:next payload)
+                                             (time/millis (:interval payload))))]
+            (queue-insert! {:name (:name payload)
+                            :state "running"
+                            :priority (now)})
+            (cron-update-next! {:id (:id payload) :next next})
             payload)))))
 
 (defn- pop-queue []
@@ -215,7 +200,7 @@
                       (if (not payload)        ; Sleep if queue is empty
                           (Thread/sleep (:poll-ms master-cf))
                           (do                ; Send the job to be processed
-                            (>!! job-ch (select-keys payload [:data :worker :_id]))
+                            (>!! job-ch (select-keys payload [:data :name :_id]))
                             (break)))))))
     (finally
       (iter* (times pool-size)
@@ -271,27 +256,25 @@
      (int (Math/pow 2 (- (:tries payload) 2)))))
 
 (defn- revive []
-  (let [t (time/minus (time/now) (time/millis (* 2 (:timeout-ms master-cf))))
-        killed (mc/find-maps (:db master-cf) (:coll master-cf) {:state "running"
-                                                                :started {$lt t}})]
+  (let [t (to-sql-time (time/minus (time/now)
+                                   (time/millis (* 2 (:timeout-ms master-cf)))))
+        killed (queue-killed-jobs {:killtime t})]
     (iter* (foreach payload killed)
            (if (exceeded? payload)
-               (mc/find-and-modify (:db master-cf)
-                                   (:coll master-cf)
-                                   {:_id (:_id payload) :state "running"}
-                                   {$set {:state "exceeded" :finished (time/now)}})
-               (mc/find-and-modify (:db master-cf)
-                                   (:coll master-cf)
-                                   {:_id (:_id payload) :state "running"}
-                                   {$set {:state "queued"
-                                          :pri (revive-priority payload)}})))))
+               (queue-abort-job! {:id (:id payload)})
+               (queue-requeue-job! {:id (:id payload)
+                                    :priority (revive-priority payload)})))))
 
 (defn- remove-old []
-  (let [t (time/plus (time/now) (:max-completed-ms master-cf))]
-    (mc/remove (:db master-cf) (:coll master-cf) {:finished {$gt t}})))
+  (let [t (to-sql-time (time/plus (time/now) (:max-completed-ms master-cf)))]
+    (queue-delete-old-jobs! {:finished t})))
 
 (define-cron revive-killed-jobs (:revive-check-ms master-cf) []
   (revive))
 
 (define-cron remove-old-jobs (:remove-check-ms master-cf) []
   (remove-old))
+
+(defn -main [& args]
+  (log/info "Starting backlog")
+  (run 8))
