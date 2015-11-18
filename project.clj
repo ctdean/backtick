@@ -3,6 +3,7 @@
   :main backtick.core
   :dependencies
     [
+     [cheshire "5.5.0"]
      [clams "0.2.6" :exclusions [ring]]
      [clojure.jdbc/clojure.jdbc-c3p0 "0.3.2"]
      [ctdean/iter "0.7.0"]

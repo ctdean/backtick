@@ -3,18 +3,6 @@
    [clojure.test :refer :all]
    [backtick.core :refer :all]))
 
-(deftest master-cf-test
-  (is (= "bt_queue" (:coll master-cf)))
-  (is (:cron master-cf))
-  (is (:poll-ms master-cf))
-  (is (:cron-ms master-cf))
-  (is (:timeout-ms master-cf))
-  (is (:revive-check-ms master-cf))
-  (is (:remove-check-ms master-cf))
-  (is (:max-completed-ms master-cf))
-  (is (:cron-window-ms master-cf))
-  (is (:max-tries master-cf)))
-
 (deftest register-test
   (let [nm (str "test-worker-" (rand-int 100))
         missing (str "missing-worker-" (rand-int 100))
@@ -29,23 +17,23 @@
         missing (str "missing-worker-" (rand-int 100))
         tag (rand-int 100)]
     ;; new job
-    (register-cron nm 100 (fn [] tag))
+    (register-cron nm 98700 (fn [] tag))
     (let [cf (get (registered-workers) nm)
           cron1 (get (registered-crons) nm)]
-      (is (= tag (cf nil)))
+      (is (= tag (cf)))
       (is (nil? (get (registered-workers) missing)))
-      (is (= 100 (:interval cron1))))
+      (is (= 98700 (:interval cron1))))
     ;; new interval
-    (register-cron nm 101 (fn [] (inc tag)))
+    (register-cron nm 98701 (fn [] (inc tag)))
     (let [cf (get (registered-workers) nm)
           cron2 (get (registered-crons) nm)]
-      (is (= (inc tag) (cf nil)))
-      (is (= 101 (:interval cron2)))
+      (is (= (inc tag) (cf)))
+      (is (= 98701 (:interval cron2)))
       ;; same interval
-      (register-cron nm 101 (fn [] (+ tag 2)))
+      (register-cron nm 98701 (fn [] (+ tag 2)))
       (let [cf (get (registered-workers) nm)
             cron3 (get (registered-crons) nm)]
-        (is (= (+ tag 2) (cf nil)))
+        (is (= (+ tag 2) (cf)))
         (is (= cron2 cron3))))))
 
 (def my-atom (atom nil))
@@ -56,5 +44,6 @@
 (define-cron my-test-cron (* 1234 100 60) []
   (reset! my-atom 'cron))
 
-(deftest define-helpers-test
-  )
+(deftest perform-test
+  (register "perform-test-job" (fn [x] x))
+  (perform "perform-test-job" 88))

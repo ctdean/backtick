@@ -1,9 +1,10 @@
 CREATE TABLE backtick_queue (
     id          serial primary key,
     name        text NOT NULL,
-    priority    integer NOT NULL,
+    priority    timestamp NOT NULL,
     state       text NOT NULL,
     tries       integer DEFAULT 0,
+    data        jsonb,
     started_at  timestamp,
     finished_at timestamp,
 

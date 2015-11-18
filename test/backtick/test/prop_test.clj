@@ -2,7 +2,7 @@
   (:require
    [backtick.core :as bt]
    [backtick.test.fixtures :as fixtures]
-   [clojure.core.async :as async :refer [alts!! chan go timeout <!! >!! <! >!]]
+   [clojure.core.async :refer [alts!! chan go timeout <!! >!! <! >!]]
    [clojure.test :refer :all]
    [clojure.test.check.clojure-test :refer :all]
    [clojure.test.check :as tc]
@@ -15,30 +15,30 @@
 (use-fixtures :once fixtures/wrap-fixture-data)
 
 (defn exec-workers [ints]
-  (clojure.pprint/cl-format true "--- try ~s\n" ints)
   (let [state (atom #{})
         ch (chan)
         name (str "prop-worker-" (rand-int 1e6))]
     (try
       (bt/register name (fn [val]
-                          (log/infof "exec-worker %s" val)
+                          (log/infof "TEST exec-worker %s" val)
                           (swap! state conj (inc val))
                           (>!! ch val)))
-      (clojure.pprint/cl-format true "--- ~s\n" (bt/registered-workers))
       (iter* (foreach i ints)
-             (bt/perform name [i]))
+             (bt/perform name i))
       (let [done (chan)]
         (go
           (iter* (times (count ints))
                  (<!! ch))
           (>! done :done))
-        (alts!! [done (timeout 1000)]))
+        (alts!! [done (timeout 10000)]))
       (finally (bt/unregister name)))
     @state))
 
-(defonce runner (future (bt/run 16)))
+(defonce runner1 (bt/start))
+(defonce runner2 (bt/start))
 
-(defspec exec-test 100
+(defspec exec-test
+  10
   (prop/for-all [ints (gen/vector gen/int)]
                 (= (set (map inc ints))
                    (exec-workers ints))))

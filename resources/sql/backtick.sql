@@ -2,7 +2,10 @@
 -- name: queue-pop
 -- Pop the top element off the backtick queue
 update backtick_queue bq
-set    state = 'running', started = now(), tries = tries + 1
+set    state = 'running',
+       started_at = now(),
+       updated_at = now(),
+       tries = tries + 1
 from (
    select id
    from   backtick_queue
@@ -16,14 +19,14 @@ returning bq.*;
 
 -- name: queue-insert!
 -- Insert a new job element
-insert into backtick
-  (name, priority, state, created_at, updated_at)
+insert into backtick_queue
+  (name, priority, state, data, created_at, updated_at)
 values
-  (:name, :priority, :state, now(), now());
+  (:name, :priority, :state, :data, now(), now());
 
 -- name: queue-finish!
 -- Mark a job as finished
-update backtick_cron
+update backtick_queue
 set    state = 'done', finished_at = now()
 where  id = :id and state = 'running'
 
@@ -57,7 +60,7 @@ where  id = :id
 -- Find all crons
 SELECT * FROM backtick_cron;
 
--- name: cron-delete
+-- name: cron-delete!
 -- Delete a cron entry
 delete from backtick_cron where id = :id
 
