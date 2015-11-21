@@ -1,4 +1,4 @@
-(defproject backtick "0.1.0-SNAPSHOT"
+(defproject backtick "0.1.0"
   :description "Background job processing for Clojure using Postgres"
   :main backtick.core
   :dependencies

@@ -53,7 +53,7 @@
   (let [n (swap! job-counter inc)]
     (let [{name :name data :data} msg
           f (@workers name)]
-      (log/debugf "Running job %s %s ..." msg n)
+      (log/debugf "Running job %s %s ..." name n)
       (if f
           (.submit pool (fn [] (try
                                  (apply f data)
