@@ -26,14 +26,14 @@ If you are using Maven, add the following repository definition to your `pom.xml
 With Leiningen:
 
 ``` clj
-[backtick "0.1.0"]
+[ctdean/backtick "0.1.0"]
 ```
 
 With Maven:
 
 ``` xml
 <dependency>
-  <groupId>backtick</groupId>
+  <groupId>ctdean</groupId>
   <artifactId>backtick</artifactId>
   <version>0.1.0</version>
 </dependency>
