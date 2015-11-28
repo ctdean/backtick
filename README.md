@@ -12,32 +12,7 @@ job runners can be distributed across multiple machines.
 
 `backtick` artifacts are [released to Clojars](https://clojars.org/clj-time/clj-time).
 
-If you are using Maven, add the following repository definition to your `pom.xml`:
-
-``` xml
-<repository>
-  <id>clojars.org</id>
-  <url>http://clojars.org/repo</url>
-</repository>
-```
-
-### Current Release
-
-With Leiningen:
-
-``` clj
-[ctdean/backtick "0.1.0"]
-```
-
-With Maven:
-
-``` xml
-<dependency>
-  <groupId>ctdean</groupId>
-  <artifactId>backtick</artifactId>
-  <version>0.1.0</version>
-</dependency>
-```
+[![Clojars Project](http://clojars.org/ctdean/backtick/latest-version.svg)](http://clojars.org/ctdean/backtick)
 
 ## Quick start
 
