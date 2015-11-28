@@ -1,5 +1,5 @@
 (defproject ctdean/backtick
-  "0.2.0"
+  "0.2.1"
   :description "Background job processing for Clojure using Postgres"
   :main backtick.core
   :dependencies
@@ -7,7 +7,7 @@
      [cheshire "5.5.0"]
      [clams "0.2.6" :exclusions [ring]]
      [clojure.jdbc/clojure.jdbc-c3p0 "0.3.2"]
-     [ctdean/iter "0.8.0"]
+     [ctdean/iter "0.8.1"]
      [org.clojure/clojure "1.7.0"]
      [org.clojure/core.async "0.1.346.0-17112a-alpha"]
      [org.clojure/java.jdbc "0.4.2"]
