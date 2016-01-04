@@ -1,0 +1,3 @@
+{
+  :bt-database-url "jdbc:postgresql://localhost:5432/backtick_test?user=postgres"
+}

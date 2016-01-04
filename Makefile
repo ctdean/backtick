@@ -1,7 +1,8 @@
 #
-# Makefile - utility commands
+# Backtick Makefile
 # 
-# Chris Dean
+
+DATABASE?=backtick
 
 all: run
 
@@ -11,18 +12,18 @@ run:
 # Create the tables
 init:
 	createuser -s postgres -h localhost || exit 0
-	createdb -Upostgres -h localhost api
-	createdb -Upostgres -h localhost api_test
+	createdb -Upostgres -h localhost $(DATABASE)
+	createdb -Upostgres -h localhost $(DATABASE)_test
 
 # Drop the tables
 drop:
-	dropdb -Upostgres -h localhost api      || exit 0
-	dropdb -Upostgres -h localhost api_test || exit 0
+	dropdb -Upostgres -h localhost $(DATABASE) || exit 0
+	dropdb -Upostgres -h localhost $(DATABASE)_test || exit 0
 
 migrate:
-	DATABASE_URL="jdbc:postgresql://localhost:5432/api?user=postgres" \
+	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)?user=postgres" \
 	    lein run -m clams.migrate migrate
-	DATABASE_URL="jdbc:postgresql://localhost:5432/api_test?user=postgres" \
+	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)_test?user=postgres" \
 	    lein run -m clams.migrate migrate
 
 # Nuke the existing databases and recreate
