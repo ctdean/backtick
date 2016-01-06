@@ -41,12 +41,11 @@ You configure the jobs using the `define-worker` macro:
   (log/infof "sum %s + %s = %s" x y (+ x y)))
 ```
 
-and put the job in the queue by calling the function with the same
-name:
+and put the job in the queue by calling the `schedule` function:
 
 ``` clj
-(log-sum 3 4)
-(log-sum 88 99)
+(schedule log-sum 3 4)
+(schedule log-sum 88 99)
 ```
 
 You may also run periodic jobs using `define-cron`
@@ -55,6 +54,9 @@ You may also run periodic jobs using `define-cron`
 (bt/define-cron heartbeat-every-5-minutes (* 1000 60 5) []
   (log/info "heartbeat"))
 ```
+
+Both `define-worker` and `define-cron` create a regular Clojure
+function of the same name.
 
 ### Servers
 
