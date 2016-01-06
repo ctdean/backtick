@@ -8,10 +8,14 @@
   (:gen-class))
 
 (defn register [name f]
-  (swap! engine/workers assoc name f))
+  ;; We store both the name => fn mapping (needed by submit-worker)
+  ;; and fn => name mapping (needed by schedule)
+  (swap! engine/workers assoc
+         name f
+         f name))
 
 (defn unregister [name]
-  (swap! engine/workers dissoc name))
+  (swap! engine/workers dissoc name (@engine/workers name)))
 
 (defn register-cron
   "Register or re-register a scheduled job.  The job is started for the
@@ -28,39 +32,38 @@
   []
   (engine/cron-map))
 
-(defn perform
+(defn schedule
   "Run a job on the backtick queue"
-  [name & args]
-  (if (not (@engine/workers name))
-      (log/errorf "No worker %s registered, not queuing job" name)
-      (engine/add name args)))
+  [registered-function & args]
+  (let [name (@engine/workers registered-function)]
+    (if (not name)
+        (log/errorf
+         "Worker % not registered. Register this function before calling schedule"
+         registered-function)
+        (engine/add name args))))
 
 ;;;
 ;;; Helpers
 ;;;
 
-(defmacro define-worker [name args & body]
-  (let [nm (str *ns* "/" name)]
+(defmacro define-worker [& function-definition]
+  (let [symbol-name (first function-definition)
+        str-nm (str *ns* "/" symbol-name)]
     `(do
-       (register ~nm (fn ~args ~@body))
-       (defn ~name [& param#]
-         (apply perform ~nm param#)))))
+       (defn ~@function-definition)
+       (register ~str-nm ~symbol-name))))
 
 (defmacro define-cron [name interval-ms args & body]
   (assert (= args []) "Cron function takes no arguments")
-  (let [nm (str *ns* "/" name)]
+  (let [symbol-name name
+        str-nm (str *ns* "/" symbol-name)]
     `(do
-       (register-cron ~nm ~interval-ms (fn ~args ~@body))
-       (defn ~name []
-         (perform ~nm)))))
+       (defn ~symbol-name ~args ~@body)
+       (register-cron ~str-nm ~interval-ms ~symbol-name))))
 
 ;;;
 ;;; Cleaners
 ;;;
-
-
-(defn revive-killed-jobs []
-  (perform "backtick.core/revive-killed-jobs"))
 
 (define-cron revive-killed-jobs (:revive-check-ms master-cf) []
   (log/info "Running revive-killed-jobs")

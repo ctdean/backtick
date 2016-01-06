@@ -83,7 +83,7 @@
                        (log/debugf "job %s ready" job)
                        (recur))
                :stop (log/debugf "job %s stop" job)
-               (let [done-ch (chan 1)
+                     (let [done-ch (chan 1)
                            worker (submit-worker pool done-ch msg)]
                        (let [[done? port] (alts! [done-ch (timeout
                                                            (:timeout-ms master-cf))])]

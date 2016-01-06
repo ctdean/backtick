@@ -19,18 +19,19 @@
         ch (chan)
         name (str "prop-worker-" (rand-int 1e6))]
     (try
-      (bt/register name (fn [val]
-                          (log/infof "TEST exec-worker %s" val)
-                          (swap! state conj (inc val))
-                          (>!! ch val)))
-      (iter* (foreach i ints)
-             (bt/perform name i))
-      (let [done (chan)]
-        (go
-          (iter* (times (count ints))
-                 (<!! ch))
-          (>! done :done))
-        (alts!! [done (timeout 10000)]))
+      (let [f (fn [val]
+                (log/infof "TEST exec-worker %s" val)
+                (swap! state conj (inc val))
+                (>!! ch val))]
+        (bt/register name f)
+        (iter* (foreach i ints)
+               (bt/schedule f i))
+        (let [done (chan)]
+          (go
+            (iter* (times (count ints))
+                   (<!! ch))
+            (>! done :done))
+          (alts!! [done (timeout 10000)])))
       (finally (bt/unregister name)))
     @state))
 
