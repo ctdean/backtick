@@ -78,22 +78,23 @@
   (iter* (foreach job (range pool-size))
          (go-loop []
            (let [msg (<! job-ch)]
-             (case msg
+             (condp = msg
                :ping (do
                        (log/debugf "job %s ready" job)
                        (recur))
                :stop (log/debugf "job %s stop" job)
                (let [done-ch (chan 1)
-                     worker (submit-worker pool done-ch msg)]
-                 (let [[done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
-                   (if done?
-                       (db/queue-finish! (select-keys msg [:id]))
-                       (do
-                         (when worker
-                           (.cancel worker true))
-                         (log/infof "job %s timeout: %s" job (:name msg)))))
-                 (log/debugf "start-jobs: waiting")
-                 (recur)))))))
+                           worker (submit-worker pool done-ch msg)]
+                       (let [[done? port] (alts! [done-ch (timeout
+                                                           (:timeout-ms master-cf))])]
+                         (if done?
+                             (db/queue-finish! (select-keys msg [:id]))
+                             (do
+                               (when worker
+                                 (.cancel worker true))
+                               (log/infof "job %s timeout: %s" job (:name msg)))))
+                       (log/debugf "start-jobs: waiting")
+                       (recur)))))))
 
 (def ^:private cron-checked (atom 0))
 
