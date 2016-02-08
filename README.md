@@ -84,7 +84,7 @@ job fails, a recurring job will revive the dead one and place it back
 in the queue.
 
 Polling isn't a great way to run a high volume queue, but using a
-Postgres table has the advanage of being simple, stable, and being
+Postgres table has the advantage of being simple, stable, and being
 able to easily handle our load.
 
 ## Authors
