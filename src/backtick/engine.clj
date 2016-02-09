@@ -8,6 +8,7 @@
    [clojure.core.async :as async :refer [chan alts! alts!!
                                          <!! >!! <! >! close!
                                          go go-loop timeout]]
+   [clojure.edn :as edn]
    [clojure.tools.logging :as log]
    [iter.core :refer [iter iter*]])
   (:import (java.util.concurrent Executors TimeUnit)))
@@ -29,10 +30,11 @@
 (defn add
   "Add a job to the queue"
   [name data]
+  (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
   (db/queue-insert! {:name name
                      :priority (to-sql-time (time/now))
                      :state "queued"
-                     :data [data]}))
+                     :data (prn-str data)}))
 
 (def workers (atom {}))
 
@@ -98,7 +100,9 @@
 (def ^:private cron-checked (atom 0))
 
 (defn- pop-payload []
-  (first (db/queue-pop)))
+  (some-> (db/queue-pop)
+          first
+          (update :data edn/read-string)))
 
 ;; Not fault tolerant
 (defn- pop-cron-aux []
@@ -115,7 +119,7 @@
             (db/queue-insert! {:name (:name payload)
                                :state "running"
                                :priority (to-sql-time (time/now))
-                               :data [[]]})
+                               :data (prn-str [])})
             (db/cron-update-next! (-> (select-keys payload [:id])
                                       (assoc :next next)))
             payload)))))
