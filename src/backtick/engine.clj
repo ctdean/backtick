@@ -99,10 +99,22 @@
 
 (def ^:private cron-checked (atom 0))
 
+(defn- edn-safe-read-string [s]
+  (try
+    (edn/read-string s)
+    (catch java.lang.RuntimeException e
+      (if (= (.getMessage e) "No reader function for tag object")
+        (do
+          (log/warn "Failed to deserialize EDN job data."
+                    "You probably scheduled the job with non-serializable arguments."
+                    "Raw data:" s)
+          nil)
+        (throw e)))))
+
 (defn- pop-payload []
   (some-> (db/queue-pop)
           first
-          (update :data edn/read-string)))
+          (update :data edn-safe-read-string)))
 
 ;; Not fault tolerant
 (defn- pop-cron-aux []
