@@ -41,3 +41,10 @@
   (prop/for-all [ints (gen/vector gen/int)]
                 (= (set (map inc ints))
                    (exec-workers ints))))
+
+(deftest higher-arity-test
+  (let [p (promise)
+        worker (fn [a b c] (deliver p (/ (+ a b) c)))]
+    (bt/register "higher-arity-worker" worker)
+    (bt/schedule worker 3 7 5)
+    (is (= @p 2))))
