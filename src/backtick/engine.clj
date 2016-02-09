@@ -8,6 +8,7 @@
    [clojure.core.async :as async :refer [chan alts! alts!!
                                          <!! >!! <! >! close!
                                          go go-loop timeout]]
+   [clojure.edn :as edn]
    [clojure.tools.logging :as log]
    [iter.core :refer [iter iter*]])
   (:import (java.util.concurrent Executors TimeUnit)))
@@ -29,10 +30,11 @@
 (defn add
   "Add a job to the queue"
   [name data]
+  (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
   (db/queue-insert! {:name name
                      :priority (to-sql-time (time/now))
                      :state "queued"
-                     :data [data]}))
+                     :data (prn-str data)}))
 
 (def workers (atom {}))
 
@@ -83,23 +85,36 @@
                        (log/debugf "job %s ready" job)
                        (recur))
                :stop (log/debugf "job %s stop" job)
-                     (let [done-ch (chan 1)
-                           worker (submit-worker pool done-ch msg)]
-                       (let [[done? port] (alts! [done-ch (timeout
-                                                           (:timeout-ms master-cf))])]
-                         (if done?
-                             (db/queue-finish! (select-keys msg [:id]))
-                             (do
-                               (when worker
-                                 (.cancel worker true))
-                               (log/infof "job %s timeout: %s" job (:name msg)))))
-                       (log/debugf "start-jobs: waiting")
-                       (recur)))))))
+               (let [done-ch (chan 1)
+                     worker (submit-worker pool done-ch msg)
+                     [done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
+                 (if done?
+                   (db/queue-finish! (select-keys msg [:id]))
+                   (do
+                     (when worker
+                       (.cancel worker true))
+                     (log/infof "job %s timeout: %s" job (:name msg))))
+                 (log/debugf "start-jobs: waiting")
+                 (recur)))))))
 
 (def ^:private cron-checked (atom 0))
 
+(defn- edn-safe-read-string [s]
+  (try
+    (edn/read-string s)
+    (catch java.lang.RuntimeException e
+      (if (= (.getMessage e) "No reader function for tag object")
+        (do
+          (log/warn "Failed to deserialize EDN job data."
+                    "You probably scheduled the job with non-serializable arguments."
+                    "Raw data:" s)
+          nil)
+        (throw e)))))
+
 (defn- pop-payload []
-  (first (db/queue-pop)))
+  (some-> (db/queue-pop)
+          first
+          (update :data edn-safe-read-string)))
 
 ;; Not fault tolerant
 (defn- pop-cron-aux []
@@ -116,7 +131,7 @@
             (db/queue-insert! {:name (:name payload)
                                :state "running"
                                :priority (to-sql-time (time/now))
-                               :data [[]]})
+                               :data (prn-str [])})
             (db/cron-update-next! (-> (select-keys payload [:id])
                                       (assoc :next next)))
             payload)))))

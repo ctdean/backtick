@@ -5,12 +5,10 @@
    [clojure.core.async :refer [alts!! chan go timeout <!! >!! <! >!]]
    [clojure.test :refer :all]
    [clojure.test.check.clojure-test :refer :all]
-   [clojure.test.check :as tc]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
    [clojure.tools.logging :as log]
-   [iter.core :refer [iter iter*]]
-   ))
+   [iter.core :refer [iter iter*]]))
 
 (use-fixtures :once fixtures/wrap-fixture-data)
 
@@ -43,3 +41,10 @@
   (prop/for-all [ints (gen/vector gen/int)]
                 (= (set (map inc ints))
                    (exec-workers ints))))
+
+(deftest higher-arity-test
+  (let [p (promise)
+        worker (fn [a b c] (deliver p (/ (+ a b) c)))]
+    (bt/register "higher-arity-worker" worker)
+    (bt/schedule worker 3 7 5)
+    (is (= @p 2))))

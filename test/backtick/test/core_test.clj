@@ -44,10 +44,15 @@
 (define-cron my-test-cron (* 1234 100 60) []
   (reset! my-atom 'cron))
 
-(defn schedule-test-job [x]
+(defn schedule-test-job-0 []
+  (+ 1 2))
+
+(defn schedule-test-job-1 [x]
   x)
 
 (deftest schedule-test
-  (register "schedule-test-job" schedule-test-job)
-  (schedule schedule-test-job 88)
+  (register "schedule-test-job-0" schedule-test-job-0)
+  (schedule schedule-test-job-0)
+  (register "schedule-test-job-1" schedule-test-job-1)
+  (schedule schedule-test-job-1 88)
   (schedule my-test-worker 2 3))

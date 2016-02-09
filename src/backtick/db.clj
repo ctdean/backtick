@@ -7,7 +7,6 @@
    [clojure.string :as string]
    [jdbc.pool.c3p0 :as pool]
    [yesql.core :refer [defqueries]])
-  (:require [backtick.jsonb])
   (:import (java.util.concurrent Executors TimeUnit)))
 
 ;;;
