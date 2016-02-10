@@ -1,5 +1,5 @@
 (defproject ctdean/backtick
-  "0.4.0"
+  "0.4.1"
   :description "Background job processing for Clojure using Postgres"
   :dependencies
   [
@@ -15,6 +15,7 @@
    [org.slf4j/slf4j-log4j12 "1.7.7"]
    [yesql "0.5.1"]
    ]
+  :jar-exclusions [#"^migrations/"]
   :plugins [[com.jakemccrary/lein-test-refresh "0.10.0"]]
   :profiles {:test {:jvm-opts ["-Dclams.env=test"]}
              :production {:jvm-opts ["-Dclams.env=production"]}})
