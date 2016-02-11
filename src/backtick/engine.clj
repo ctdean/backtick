@@ -47,23 +47,26 @@
                               name
                               (swap! thread-counter inc)))))))
 
+(def ^:dynamic *job-id*)
+
 (defn submit-worker [pool ch msg]
   (let [{id :id name :name data :data} msg
         f (@workers name)]
     (log/debugf "Running job %s %s ..." id name)
     (if f
       (.submit pool (fn [] (try
-                             (apply f data)
+                             (binding [*job-id* id]
+                               (apply f data))
                              (catch Throwable e
                                (log/warnf e "Unable to run job %s %s" id name))
                              (finally
                                (log/debugf "Running job %s %s ... done" id name)
                                (>!! ch :done)
                                (log/debugf "Running job %s %s ... done sent" id name)))))
-        (do
-          (log/errorf "No worker %s registered, discarding job %s" name id)
-          (>!! ch :done)
-          nil))))
+      (do
+        (log/errorf "No worker %s registered, discarding job %s" name id)
+        (>!! ch :done)
+        nil))))
 
 (defn- start-runners [pool pool-size job-ch]
   (log/debugf "start-runners")
