@@ -43,7 +43,7 @@ where id = :id and state = 'running'
 -- name: queue-requeue-job!
 -- Put a job back in the queue that did not finish
 update backtick_queue
-set state = 'queued', priority = :priority, update_at = now()
+set state = 'queued', priority = :priority, updated_at = now()
 where id = :id and state = 'running'
 
 -- name: queue-delete-old-jobs!

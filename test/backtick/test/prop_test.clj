@@ -12,6 +12,15 @@
 
 (use-fixtures :once fixtures/wrap-fixture-data)
 
+(defn wrap-run-bt-instance [f]
+  (let [runner1 (bt/start)
+        runner2 (bt/start)]
+    (f)
+    (runner1) ; shutdown
+    (runner2)))
+
+(use-fixtures :each wrap-run-bt-instance)
+
 (defn exec-workers [ints]
   (let [state (atom #{})
         ch (chan)
@@ -32,9 +41,6 @@
           (alts!! [done (timeout 10000)])))
       (finally (bt/unregister name)))
     @state))
-
-(defonce runner1 (bt/start))
-(defonce runner2 (bt/start))
 
 (defspec exec-test
   10
