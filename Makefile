@@ -9,11 +9,12 @@ all: run
 run:
 	lein trampoline run
 
-# Create the tables
+# Create the tables and link migrations
 init:
-	createuser -s postgres -h localhost || exit 0
-	createdb -Upostgres -h localhost $(DATABASE)
-	createdb -Upostgres -h localhost $(DATABASE)_test
+	- createuser -s postgres -h localhost
+	- createdb -Upostgres -h localhost $(DATABASE)
+	- createdb -Upostgres -h localhost $(DATABASE)_test
+	- ln -ns backtick/migrations resources/migrations
 
 # Drop the tables
 drop:

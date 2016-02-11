@@ -5,6 +5,7 @@
 /app.log
 /checkouts
 /classes
+/resources/migrations
 /st.com.bind
 /st.net.bind
 /target
