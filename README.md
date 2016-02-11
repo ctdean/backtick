@@ -76,8 +76,7 @@ queue and then running jobs from that queue.  There is one thread that
 polls Postgres and then hands the job to be processed by a separate
 thread pool.
 
-Any data needed for the job is encoded as a JSON object in the
-Postgres table.
+Any data needed for the job is encoded as an EDN object in the Postgres table.
 
 When a job is completed, it is marked in the queue as done.  If the
 job fails, a recurring job will revive the dead one and place it back
@@ -86,6 +85,13 @@ in the queue.
 Polling isn't a great way to run a high volume queue, but using a
 Postgres table has the advantage of being simple, stable, and being
 able to easily handle our load.
+
+## Glossary
+
+- Worker: A function that's registered with Backtick.
+- Job: A unit of work that is scheduled to be run. Running a job causes a worker to be invoked.
+- Runner: A process that executes a job.
+- Cron: A job that recurs based on the time.
 
 ## Authors
 
