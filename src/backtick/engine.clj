@@ -49,27 +49,23 @@
                               name
                               (swap! thread-counter inc)))))))
 
-(def ^:private job-counter (atom 0))
-
 (defn submit-worker [pool ch msg]
-  (let [n (swap! job-counter inc)]
-    (let [{name :name data :data} msg
-          f (@workers name)]
-      (log/debugf "Running job %s %s ..." name n)
-      (if f
-          (.submit pool (fn [] (try
-                                 (apply f data)
-                                 (catch Throwable e
-                                   (log/warnf e "Unable to run job %s" name))
-                                 (finally
-                                   (log/debugf "Running job %s %s ... done" name n)
-                                   (>!! ch :done)
-                                   (log/debugf "Running job %s %s ... done sent"
-                                               name n)))))
-          (do
-            (log/errorf "No worker %s registered, discarding job" name)
-            (>!! ch :done)
-            nil)))))
+  (let [{id :id name :name data :data} msg
+        f (@workers name)]
+    (log/debugf "Running job %s %s ..." id name)
+    (if f
+      (.submit pool (fn [] (try
+                             (apply f data)
+                             (catch Throwable e
+                               (log/warnf e "Unable to run job %s %s" id name))
+                             (finally
+                               (log/debugf "Running job %s %s ... done" id name)
+                               (>!! ch :done)
+                               (log/debugf "Running job %s %s ... done sent" id name)))))
+        (do
+          (log/errorf "No worker %s registered, discarding job" name)
+          (>!! ch :done)
+          nil))))
 
 ;;;
 ;;; job
@@ -93,7 +89,7 @@
                    (do
                      (when worker
                        (.cancel worker true))
-                     (log/infof "job %s timeout: %s" job (:name msg))))
+                     (log/infof "job %s timeout: %s %s" job (:id msg) (:name msg))))
                  (log/debugf "start-jobs: waiting")
                  (recur)))))))
 
