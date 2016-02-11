@@ -5,13 +5,11 @@
    [backtick.db :as db]
    [clj-time.core :as time]
    [clj-time.coerce :refer [to-sql-time to-date-time]]
-   [clojure.core.async :as async :refer [chan alts! alts!!
-                                         <!! >!! <! >! close!
-                                         go go-loop timeout]]
+   [clojure.core.async :as async :refer [chan alts! alts!! >!! <! >! go-loop timeout]]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
    [iter.core :refer [iter iter*]])
-  (:import (java.util.concurrent Executors TimeUnit)))
+  (:import java.util.concurrent.Executors))
 
 (defn cron-add
   "Add a cron job to the DB.  The job is started for the
@@ -49,42 +47,37 @@
                               name
                               (swap! thread-counter inc)))))))
 
-(def ^:private job-counter (atom 0))
+(def ^:dynamic *job-id*)
 
 (defn submit-worker [pool ch msg]
-  (let [n (swap! job-counter inc)]
-    (let [{name :name data :data} msg
-          f (@workers name)]
-      (log/debugf "Running job %s %s ..." name n)
-      (if f
-          (.submit pool (fn [] (try
-                                 (apply f data)
-                                 (catch Throwable e
-                                   (log/warnf e "Unable to run job %s" name))
-                                 (finally
-                                   (log/debugf "Running job %s %s ... done" name n)
-                                   (>!! ch :done)
-                                   (log/debugf "Running job %s %s ... done sent"
-                                               name n)))))
-          (do
-            (log/errorf "No worker %s registered, discarding job" name)
-            (>!! ch :done)
-            nil)))))
+  (let [{id :id name :name data :data} msg
+        f (@workers name)]
+    (log/debugf "Running job %s %s ..." id name)
+    (if f
+      (.submit pool (fn [] (try
+                             (binding [*job-id* id]
+                               (apply f data))
+                             (catch Throwable e
+                               (log/warnf e "Unable to run job %s %s" id name))
+                             (finally
+                               (log/debugf "Running job %s %s ... done" id name)
+                               (>!! ch :done)
+                               (log/debugf "Running job %s %s ... done sent" id name)))))
+      (do
+        (log/errorf "No worker %s registered, discarding job %s" name id)
+        (>!! ch :done)
+        nil))))
 
-;;;
-;;; job
-;;;
-
-(defn- start-jobs [pool pool-size job-ch]
-  (log/debugf "start-jobs")
-  (iter* (foreach job (range pool-size))
+(defn- start-runners [pool pool-size job-ch]
+  (log/debugf "start-runners")
+  (iter* (foreach r (range pool-size))
          (go-loop []
            (let [msg (<! job-ch)]
              (condp = msg
                :ping (do
-                       (log/debugf "job %s ready" job)
+                       (log/debugf "runner %s ready" r)
                        (recur))
-               :stop (log/debugf "job %s stop" job)
+               :stop (log/debugf "runner %s stop" r)
                (let [done-ch (chan 1)
                      worker (submit-worker pool done-ch msg)
                      [done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
@@ -93,8 +86,11 @@
                    (do
                      (when worker
                        (.cancel worker true))
-                     (log/infof "job %s timeout: %s" job (:name msg))))
-                 (log/debugf "start-jobs: waiting")
+                     (log/infof "runner %s timed out job: %s %s"
+                                r
+                                (:id msg)
+                                (:name msg))))
+                 (log/debugf "start-runners: waiting")
                  (recur)))))))
 
 (def ^:private cron-checked (atom 0))
@@ -190,7 +186,7 @@
             (log/infof "Backlog starting")
             (let [pool (Executors/newFixedThreadPool pool-size (make-thread-factory))
                   job-ch (chan)]
-              (start-jobs pool pool-size job-ch)
+              (start-runners pool pool-size job-ch)
               (run-queue pool-size job-ch keep-running-queue?)
               (.shutdown pool)
               (log/infof "Shutdown complete")))]
