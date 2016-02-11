@@ -12,17 +12,20 @@
   ;; and fn => name mapping (needed by schedule)
   (swap! engine/workers assoc
          name f
-         f name))
+         f name)
+  name)
 
 (defn unregister [name]
-  (swap! engine/workers dissoc name (@engine/workers name)))
+  (swap! engine/workers dissoc name (@engine/workers name))
+  name)
 
 (defn register-cron
   "Register or re-register a scheduled job.  The job is started for the
    first time interval ms from now."
   [name interval f]
   (register name f)
-  (engine/cron-add name interval))
+  (engine/cron-add name interval)
+  name)
 
 (defn registered-workers []
   @engine/workers)
