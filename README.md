@@ -89,7 +89,8 @@ able to easily handle our load.
 
 ## Authors
 
-Chris Dean <ctdean@sokitomi.com>
+- Chris Dean <ctdean@sokitomi.com>
+- Jim Brusstar <jim.brusstar@gmail.com>
 
 ## License
 
