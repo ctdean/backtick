@@ -29,10 +29,10 @@
   "Add a job to the queue"
   [name data]
   (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
-  (db/queue-insert! {:name name
-                     :priority (to-sql-time (time/now))
-                     :state "queued"
-                     :data (prn-str data)}))
+  (db/queue-insert<! {:name name
+                      :priority (to-sql-time (time/now))
+                      :state "queued"
+                      :data (prn-str data)}))
 
 (def workers (atom {}))
 
@@ -123,14 +123,14 @@
             (db/cron-delete! payload)
             (pop-cron-aux))
           (let [next (to-sql-time (time/plus (to-date-time (:next payload))
-                                             (time/millis (:interval payload))))]
-            (db/queue-insert! {:name (:name payload)
-                               :state "running"
-                               :priority (to-sql-time (time/now))
-                               :data (prn-str [])})
+                                             (time/millis (:interval payload))))
+                inserted (db/queue-insert<! {:name (:name payload)
+                                             :state "running"
+                                             :priority (to-sql-time (time/now))
+                                             :data (prn-str [])})]
             (db/cron-update-next! (-> (select-keys payload [:id])
                                       (assoc :next next)))
-            payload)))))
+            (assoc payload :id (:id inserted)))))))
 
 (defn- pop-cron []
   (try
