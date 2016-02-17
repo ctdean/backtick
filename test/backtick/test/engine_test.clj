@@ -6,13 +6,19 @@
 
 (deftest add-test
   (let [spy (atom [])]
-    (with-redefs [backtick.db/queue-insert! #(reset! spy %)]
+    (with-redefs [backtick.db/queue-insert<! #(reset! spy %)]
       (engine/add "foo" {:bar "baz" :quux 123 :flim :flam}))
     (is (contains? @spy :priority))
     (is (= (dissoc @spy :priority)
            {:name "foo"
             :state "queued"
-            :data "{:bar \"baz\", :quux 123, :flim :flam}\n"}))))
+            :data "{:bar \"baz\", :quux 123, :flim :flam}\n"})))
+  (let [inserted (engine/add "foo" [1 2 3])]
+    (is (= 0 (:tries inserted)))
+    (is (:started_at inserted))
+    (is (> (:id inserted) 0))
+    (is (= "queued" (:state inserted)))
+    (is (= "[1 2 3]\n" (:data inserted)))))
 
 (defprotocol FakeThreadPool
   (submit [this job]))
