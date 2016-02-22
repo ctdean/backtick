@@ -47,7 +47,7 @@
                               name
                               (swap! thread-counter inc)))))))
 
-(def ^:dynamic *job-id*)
+(def ^:dynamic *job-id* nil)
 
 (defn submit-worker [pool ch msg]
   (let [{id :id name :name data :data} msg
