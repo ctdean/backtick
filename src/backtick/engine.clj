@@ -1,6 +1,7 @@
 (ns backtick.engine
   "@ctdean"
   (:require
+   [backtick.cleaner :as cleaner]
    [backtick.conf :refer [master-cf]]
    [backtick.db :as db]
    [clj-time.core :as time]
@@ -58,7 +59,8 @@
                              (binding [*job-id* id]
                                (apply f data))
                              (catch Throwable e
-                               (log/warnf e "Unable to run job %s %s" id name))
+                               (log/warnf e "Unable to run job %s %s" id name)
+                               (cleaner/revive-one-job id))
                              (finally
                                (log/debugf "Running job %s %s ... done" id name)
                                (>!! ch :done)
@@ -89,7 +91,8 @@
                      (log/infof "runner %s timed out job: %s %s"
                                 r
                                 (:id msg)
-                                (:name msg))))
+                                (:name msg))
+                     (cleaner/revive-one-job (:id msg))))
                  (log/debugf "start-runners: waiting")
                  (recur)))))))
 

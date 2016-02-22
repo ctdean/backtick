@@ -5,22 +5,52 @@
    [backtick.db :as db]
    [clj-time.core :as time]
    [clj-time.coerce :refer [to-sql-time]]
-   [iter.core :refer [iter iter*]]))
+   [clojure.tools.logging :as log]
+   [iter.core :refer [iter iter!]]))
 
 ;;;
 ;;; Revive jobs that never finished.
 ;;;
 
-(defn- exceeded? [payload]
-  (>= (:tries payload)
-      (:max-tries master-cf)))
+(defn- exceeded? [tries]
+  (>= tries (:max-tries master-cf)))
 
-(defn- revive-priority [payload]
-  (to-sql-time
-   (time/plus (time/now)
-              (time/millis
-               (int (* (:retry-ms master-cf)
-                       (Math/pow 2 (- (:tries payload 1) 2))))))))
+(defn- revive-range-ms [tries]
+  (let [base (int (* (:retry-ms master-cf)
+                     (Math/pow 2 (dec (or tries 1)))))]
+    [base (* 2 base)]))
+
+(defn- time-unit [x]
+  (cond
+   (< x 1000) (format "%3.1f %5s" x "ms")
+   (< x (* 60 1000)) (format "%3.1f %5s" (/ x 1000.0) "secs")
+   (< x (* 60 60 1000)) (format "%3.1f %5s" (/ x 60 1000.0) "mins")
+   :else (format "%3.1f %5s" (/ x 60 60 1000.0) "hours")))
+
+(defn- dump-revive-range
+  "Print the possible revive times.  Useful for debugging."
+  []
+  (iter! (foreach tries (range 1 (:max-tries master-cf)))
+         (let [[low hi] (revive-range-ms tries)]
+           (printf "%2d %12s %12s\n" tries (time-unit low) (time-unit hi)))))
+
+(defn- revive-priority [tries]
+  (let [[lo hi] (revive-range-ms tries)
+        p (+ lo (rand-int (- hi lo)))]
+    (to-sql-time
+     (time/plus (time/now) (time/millis p)))))
+
+(defn revive-one-job
+  "Requeue a job to be run later"
+  ([id]
+   (if-let [payload (first (db/queue-running-job {:id id}))]
+     (revive-one-job id (:tries payload))
+     (log/errorf "No id for revive-one-job: %s" id)))
+  ([id tries]
+   (if (exceeded? tries)
+       (db/queue-abort-job! {:id id})
+       (db/queue-requeue-job!{:id id
+                              :priority (revive-priority tries)}))))
 
 (defn revive
   "Revive jobs that never finished.  Will be run from a backtick job."
@@ -28,11 +58,8 @@
   (let [t (to-sql-time (time/minus (time/now)
                                    (time/millis (* 2 (:timeout-ms master-cf)))))
         killed (db/queue-killed-jobs {:killtime t})]
-    (iter* (foreach payload killed)
-           (if (exceeded? payload)
-               (db/queue-abort-job! (select-keys payload [:id]))
-               (db/queue-requeue-job! (-> (select-keys payload [:id])
-                                          (assoc :priority (revive-priority payload))))))))
+    (iter! (foreach payload killed)
+           (revive-one-job (:id payload) (:tries payload)))))
 
 ;;;
 ;;; Remove old jobs
