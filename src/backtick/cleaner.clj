@@ -49,8 +49,8 @@
   ([id tries]
    (if (exceeded? tries)
        (db/queue-abort-job! {:id id})
-       (db/queue-requeue-job!{:id id
-                              :priority (revive-priority tries)}))))
+       (db/queue-requeue-job! {:id id
+                               :priority (revive-priority tries)}))))
 
 (defn revive
   "Revive jobs that never finished.  Will be run from a backtick job."
