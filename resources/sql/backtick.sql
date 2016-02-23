@@ -30,6 +30,11 @@ update backtick_queue
 set    state = 'done', finished_at = now()
 where  id = :id and state = 'running'
 
+-- name: queue-running-job
+-- Find a job that is still running
+select * from backtick_queue
+where id = :id and state = 'running'
+
 -- name: queue-killed-jobs
 -- Find jobs that haven't finished in time
 select * from backtick_queue
@@ -39,7 +44,7 @@ where state = 'running'
 -- name: queue-abort-job!
 -- Abort a job that has been tried too many times
 update backtick_queue
-set state = 'exceeded', finished_at = now()
+set state = 'exceeded', updated_at = now(), finished_at = now()
 where id = :id and state = 'running'
 
 -- name: queue-requeue-job!
