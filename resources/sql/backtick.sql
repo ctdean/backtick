@@ -8,10 +8,10 @@ set    state = 'running',
        tries = tries + 1
 from (
    select id
-   from   backtick_queue
-   where  state = 'queued'
+   from backtick_queue
+   where state = 'queued' and (run_at is null or run_at >= now())
    order by priority
-   limit  1
+   limit 1
    for update
    ) sub
 where  bq.id = sub.id
@@ -20,9 +20,9 @@ returning bq.*;
 -- name: queue-insert<!
 -- Insert a new job element
 insert into backtick_queue
-  (name, priority, state, data, started_at, created_at, updated_at)
+  (name, priority, state, data, run_at, started_at, created_at, updated_at)
 values
-  (:name, :priority, :state, :data, now(), now(), now());
+  (:name, :priority, :state, :data, :run_at, now(), now(), now());
 
 -- name: queue-finish!
 -- Mark a job as finished

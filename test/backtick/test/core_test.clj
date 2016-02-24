@@ -1,7 +1,15 @@
 (ns backtick.test.core-test
   (:require
-   [clojure.test :refer :all]
-   [backtick.core :refer :all]))
+   [backtick.core :refer :all]
+   [backtick.db :as db]
+   [backtick.test.fixtures :refer [wrap-clean-data]]
+   [clj-time.core :as t]
+   [clj-time.coerce :as tc]
+   [clojure.edn :as edn]
+   [clojure.java.jdbc :as jdbc]
+   [clojure.test :refer :all]))
+
+(use-fixtures :each wrap-clean-data)
 
 (deftest register-test
   (let [nm (str "test-worker-" (rand-int 100))
@@ -35,12 +43,31 @@
 (defn schedule-test-job-1 [x]
   x)
 
+(defn- db-query-bt-queue []
+  (jdbc/query db/spec "SELECT * FROM backtick_queue ORDER BY id ASC"))
+
 (deftest schedule-test
   (register "schedule-test-job-0" schedule-test-job-0)
   (schedule schedule-test-job-0)
   (register "schedule-test-job-1" schedule-test-job-1)
   (schedule schedule-test-job-1 88)
-  (schedule my-test-worker 2 3))
+  (schedule my-test-worker 2 3)
+  (let [jobs (db-query-bt-queue)]
+    (is (every? (comp nil? :run_at) jobs))
+    (is (= [nil [88] [2 3]] (->> jobs (map :data) (map edn/read-string))))))
+
+(deftest schedule-at-test
+  (let [now (t/now)
+        later (t/plus (t/now) (t/hours 1))
+        laterer (t/plus (t/now) (t/days 1))]
+    (register "at-job-test-0" schedule-test-job-0)
+    (schedule-at now schedule-test-job-0)
+    (register "at-job-test-1" schedule-test-job-1)
+    (schedule-at later schedule-test-job-1 88)
+    (schedule-at laterer my-test-worker 2 3)
+    (let [jobs (db-query-bt-queue)]
+      (is (= (map tc/to-sql-time [now later laterer]) (map :run_at jobs)))
+      (is (= [nil [88] [2 3]] (->> jobs (map :data) (map edn/read-string)))))))
 
 (deftest schedule-recurring-test
   (let [nm (str "test-worker-" (rand-int 100))

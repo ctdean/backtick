@@ -4,7 +4,7 @@
    [backtick.cleaner :as cleaner]
    [backtick.conf :refer [master-cf]]
    [backtick.db :as db]
-   [clj-time.core :as time]
+   [clj-time.core :as t]
    [clj-time.coerce :refer [to-sql-time to-date-time]]
    [clojure.core.async :as async :refer [chan alts! alts!! >!! <! >! go-loop timeout]]
    [clojure.edn :as edn]
@@ -17,7 +17,7 @@
    first time interval ms from now."
   [name interval]
   (let [real-interval (max (:cron-resolution-ms master-cf) interval)
-        next (to-sql-time (time/plus (time/now) (time/millis real-interval)))]
+        next (to-sql-time (t/plus (t/now) (t/millis real-interval)))]
     (db/cron-upsert-interval {:name name :interval (int real-interval) :next next})))
 
 (defn cron-map
@@ -28,10 +28,11 @@
 
 (defn add
   "Add a job to the queue"
-  [name data]
+  [time name data]
   (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
   (db/queue-insert<! {:name name
-                      :priority (to-sql-time (time/now))
+                      :priority (to-sql-time (t/now))
+                      :run_at (to-sql-time time)
                       :state "queued"
                       :data (prn-str data)}))
 
@@ -117,19 +118,20 @@
 
 ;; Not fault tolerant
 (defn- pop-cron-aux []
-  (let [now (time/now)
-        window (to-sql-time (time/plus now (time/millis (:cron-window-ms master-cf))))]
+  (let [now (t/now)
+        window (to-sql-time (t/plus now (t/millis (:cron-window-ms master-cf))))]
     (when-let [payload (first (db/cron-next {:now (to-sql-time now) :next window}))]
       (if (not (@workers (:name payload)))
           (do
             (log/warnf "No cron worker %s registered, removing job" (:name payload))
             (db/cron-delete! payload)
             (pop-cron-aux))
-          (let [next (to-sql-time (time/plus (to-date-time (:next payload))
-                                             (time/millis (:interval payload))))
+          (let [next (to-sql-time (t/plus (to-date-time (:next payload))
+                                          (t/millis (:interval payload))))
                 inserted (db/queue-insert<! {:name (:name payload)
                                              :state "running"
-                                             :priority (to-sql-time (time/now))
+                                             :priority (to-sql-time (t/now))
+                                             :run_at nil
                                              :data (prn-str [])})]
             (db/cron-update-next! (-> (select-keys payload [:id])
                                       (assoc :next next)))

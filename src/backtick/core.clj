@@ -4,6 +4,7 @@
    [backtick.conf :refer [master-cf]]
    [backtick.cleaner :as cleaner]
    [backtick.engine :as engine]
+   [clj-time.core :as t]
    [clojure.tools.logging :as log])
   (:gen-class))
 
@@ -54,18 +55,18 @@
                                 worker)
                     nil))))
 
-(defn schedule
-  "Schedule a job on the Backtick queue to be run as soon as possible. Worker can be
-   either the worker's registered name or a reference to the worker function itself."
-  [worker & args]
-  (when-let [name (resolve-worker worker)]
-    (engine/add name args)))
-
 (defn schedule-at
   "Schedule a job on the Backtick queue to be run at the appointed time. Worker can be
    either the worker's registered name or a reference to the worker function itself."
   [time worker & args]
-  (throw (Exception. "Not implemented yet!")))
+  (when-let [name (resolve-worker worker)]
+    (engine/add time name args)))
+
+(defn schedule
+  "Schedule a job on the Backtick queue to be run as soon as possible. Worker can be
+   either the worker's registered name or a reference to the worker function itself."
+  [worker & args]
+  (apply schedule-at nil worker args))
 
 (defn schedule-recurring
   "Schedule a job to be run on the Backtick queue on a recurring basis, every msec

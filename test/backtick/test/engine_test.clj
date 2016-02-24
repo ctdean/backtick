@@ -1,19 +1,25 @@
 (ns backtick.test.engine-test
   (:require
+   [clj-time.coerce :as tc]
+   [clj-time.core :as t]
    [clojure.core.async :refer [<!! chan thread]]
    [clojure.test :refer :all]
    [backtick.engine :as engine]))
 
 (deftest add-test
-  (let [spy (atom [])]
+  (let [spy (atom {})
+        now (t/now)
+        run-at (t/plus now (t/hours 1))]
     (with-redefs [backtick.db/queue-insert<! #(reset! spy %)]
-      (engine/add "foo" {:bar "baz" :quux 123 :flim :flam}))
-    (is (contains? @spy :priority))
-    (is (= (dissoc @spy :priority)
+      (engine/add run-at "foo" {:bar "baz" :quux 123 :flim :flam}))
+    (is (= (dissoc @spy :priority :run_at)
            {:name "foo"
             :state "queued"
-            :data "{:bar \"baz\", :quux 123, :flim :flam}\n"})))
-  (let [inserted (engine/add "foo" [1 2 3])]
+            :data "{:bar \"baz\", :quux 123, :flim :flam}\n"}))
+    (is (t/within? (t/interval now (t/plus now (t/seconds 1)))
+                   (tc/from-sql-time (@spy :priority))))
+    (is (= (@spy :run_at) (tc/to-sql-time run-at))))
+  (let [inserted (engine/add (t/now) "foo" [1 2 3])]
     (is (= 0 (:tries inserted)))
     (is (:started_at inserted))
     (is (> (:id inserted) 0))

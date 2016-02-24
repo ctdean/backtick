@@ -4,6 +4,7 @@
   :dependencies
   [
    [clams "0.2.6" :exclusions [ring]]
+   [clj-time "0.11.0"]
    [clojure.jdbc/clojure.jdbc-c3p0 "0.3.2"]
    [ctdean/iter "0.10.3" :exclusions [medley]]
    [org.clojure/clojure "1.7.0"]
