@@ -49,14 +49,14 @@ and put the job in the queue by calling the `schedule` function:
 (schedule log-sum 88 99)
 ```
 
-You may also run periodic jobs using `define-cron`
+You may also run periodic jobs using `define-recurring`
 
 ``` clj
-(bt/define-cron heartbeat-every-5-minutes (* 1000 60 5) []
+(bt/define-recurring heartbeat-every-5-minutes (* 1000 60 5) []
   (log/info "heartbeat"))
 ```
 
-Both `define-worker` and `define-cron` create a regular Clojure
+Both `define-worker` and `define-recurring` create a regular Clojure
 function of the same name.
 
 ### Servers
@@ -93,6 +93,9 @@ easily handle our load.
 - Worker: A function that's registered with Backtick.
 - Job: A unit of work that is scheduled to be run. Running a job
   causes a worker to be invoked.
+- At job: A job scheduled to run at a particular time in the future.
+- Recurring job: A job scheduled to run repeatedly after a particular time interval
+  has elapsed.
 - Runner: A process that executes a job.
 - Cron: A job that recurs based on the time.
 

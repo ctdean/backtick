@@ -1,7 +1,6 @@
 (ns backtick.test.prop-test
   (:require
    [backtick.core :as bt]
-   [backtick.test.fixtures :as fixtures]
    [clojure.core.async :refer [alts!! chan go timeout <!! >!! <! >!]]
    [clojure.test :refer :all]
    [clojure.test.check.clojure-test :refer :all]
@@ -9,8 +8,6 @@
    [clojure.test.check.properties :as prop]
    [clojure.tools.logging :as log]
    [iter.core :refer [iter iter*]]))
-
-(use-fixtures :once fixtures/wrap-fixture-data)
 
 (defn wrap-run-bt-instance [f]
   (let [runner1 (bt/start)
