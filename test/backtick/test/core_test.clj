@@ -34,8 +34,8 @@
 (define-worker my-test-worker [a b]
   (reset! my-atom (+ a b)))
 
-(define-recurring my-test-cron (* 1234 100 60) []
-  (reset! my-atom 'cron))
+(define-recurring my-test-recurring (* 1234 100 60) []
+  (reset! my-atom 'recurring))
 
 (defn schedule-test-job-0 []
   (+ 1 2))
@@ -77,21 +77,21 @@
     (register nm (fn [] tag))
     (schedule-recurring 98700 nm)
     (let [cf (get (registered-workers) nm)
-          cron1 (get (recurring-jobs) nm)]
+          rec1 (get (recurring-jobs) nm)]
       (is (= tag (cf)))
       (is (nil? (get (registered-workers) missing)))
-      (is (= 98700 (:interval cron1))))
+      (is (= 98700 (:interval rec1))))
     ;; new interval
     (register nm (fn [] (inc tag)))
     (schedule-recurring 98701 nm)
     (let [cf (get (registered-workers) nm)
-          cron2 (get (recurring-jobs) nm)]
+          rec2 (get (recurring-jobs) nm)]
       (is (= (inc tag) (cf)))
-      (is (= 98701 (:interval cron2)))
+      (is (= 98701 (:interval rec2)))
       ;; same interval
       (register nm (fn [] (+ tag 2)))
       (schedule-recurring 98701 nm)
       (let [cf (get (registered-workers) nm)
-            cron3 (get (recurring-jobs) nm)]
+            rec3 (get (recurring-jobs) nm)]
         (is (= (+ tag 2) (cf)))
-        (is (= cron2 cron3))))))
+        (is (= rec2 rec3))))))

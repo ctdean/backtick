@@ -1,5 +1,5 @@
 (ns backtick.engine
-  "@ctdean"
+  "@ctdean @jimbru"
   (:require
    [backtick.cleaner :as cleaner]
    [backtick.conf :refer [master-cf]]
@@ -12,19 +12,19 @@
    [iter.core :refer [iter iter*]])
   (:import java.util.concurrent.Executors))
 
-(defn cron-add
-  "Add a cron job to the DB.  The job is started for the
-   first time interval ms from now."
+(defn recurring-add
+  "Add a recurring job to the database. The job is started for the first time
+   interval ms from now."
   [name interval]
-  (let [real-interval (max (:cron-resolution-ms master-cf) interval)
+  (let [real-interval (max (:recurring-resolution-ms master-cf) interval)
         next (to-sql-time (t/plus (t/now) (t/millis real-interval)))]
-    (db/cron-upsert-interval {:name name :interval (int real-interval) :next next})))
+    (db/recurring-upsert-interval {:name name :interval (int real-interval) :next next})))
 
-(defn cron-map
-  "All the cron jobs as a map"
+(defn recurring-map
+  "All the recurring jobs as a map."
   []
-  (iter (foreach cron (db/cron-all))
-        (collect-map (:name cron) cron)))
+  (iter (foreach job (db/recurring-all))
+        (collect-map (:name job) job)))
 
 (defn add
   "Add a job to the queue"
@@ -98,7 +98,7 @@
                  (log/debugf "start-runners: waiting")
                  (recur)))))))
 
-(def ^:private cron-checked (atom 0))
+(def ^:private recurring-checked (atom 0))
 
 (defn- edn-safe-read-string [s]
   (try
@@ -118,15 +118,16 @@
           (update :data edn-safe-read-string)))
 
 ;; Not fault tolerant
-(defn- pop-cron-aux []
+(defn- pop-recurring-aux []
   (let [now (t/now)
-        window (to-sql-time (t/plus now (t/millis (:cron-window-ms master-cf))))]
-    (when-let [payload (first (db/cron-next {:now (to-sql-time now) :next window}))]
+        window (to-sql-time (t/plus now (t/millis (:recurring-window-ms master-cf))))]
+    (when-let [payload (first (db/recurring-next {:now (to-sql-time now) :next window}))]
       (if (not (@workers (:name payload)))
           (do
-            (log/warnf "No cron worker %s registered, removing job" (:name payload))
-            (db/cron-delete! payload)
-            (pop-cron-aux))
+            (log/warnf "No worker registered for recurring job %s, removing it!"
+                       (:name payload))
+            (db/recurring-delete! payload)
+            (pop-recurring-aux))
           (let [next (to-sql-time (t/plus (to-date-time (:next payload))
                                           (t/millis (:interval payload))))
                 inserted (db/queue-insert<! {:name (:name payload)
@@ -135,23 +136,24 @@
                                              :run_at nil
                                              :tries 1
                                              :data (prn-str [])})]
-            (db/cron-update-next! (-> (select-keys payload [:id])
-                                      (assoc :next next)))
+            (db/recurring-update-next! (-> (select-keys payload [:id])
+                                           (assoc :next next)))
             (assoc payload :id (:id inserted)))))))
 
-(defn- pop-cron []
+(defn- pop-recurring []
   (try
-    (pop-cron-aux)
+    (pop-recurring-aux)
     (catch Throwable e
-      (log/warn e "Error retrieving cron entry")
+      (log/warn e "Error retrieving recurring job.")
       nil)))
 
 (defn- pop-queue-aux []
-  (or (when (> (System/currentTimeMillis) (+ @cron-checked (:cron-ms master-cf)))
-        (if-let [payload (pop-cron)]
+  (or (when (> (System/currentTimeMillis)
+               (+ @recurring-checked (:recurring-ms master-cf)))
+        (if-let [payload (pop-recurring)]
           payload
           (do
-            (reset! cron-checked (System/currentTimeMillis))
+            (reset! recurring-checked (System/currentTimeMillis))
             nil)))
       (pop-payload)))
 

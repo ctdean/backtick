@@ -36,7 +36,7 @@
 (defn recurring-jobs
   "Returns a map of all recurring jobs, keyed by name."
   []
-  (engine/cron-map))
+  (engine/recurring-map))
 
 (defn- resolve-worker [worker]
   (let [v (@engine/workers worker)]
@@ -75,7 +75,7 @@
   [msec worker & args]
   (assert (empty? args) "Recurring jobs may not take arguments.")
   (when-let [name (resolve-worker worker)]
-    (engine/cron-add name msec)))
+    (engine/recurring-add name msec)))
 
 ;;;
 ;;; Helpers

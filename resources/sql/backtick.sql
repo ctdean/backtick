@@ -57,34 +57,34 @@ where id = :id and state = 'running'
 -- Delete very old jobs
 delete from backtick_queue where finished_at > :finished
 
--- name: cron-update-next!
--- Update the next runtime foran existing cron element
-update backtick_cron
+-- name: recurring-update-next!
+-- Update the next runtime for an existing recurring job
+update backtick_recurring
 set    next = :next
 where  id = :id
 
--- name: cron-all
--- Find all crons
-SELECT * FROM backtick_cron;
+-- name: recurring-all
+-- Find all recurring jobs
+SELECT * FROM backtick_recurring;
 
--- name: cron-delete!
--- Delete a cron entry
-delete from backtick_cron where id = :id
+-- name: recurring-delete!
+-- Delete a recurring job
+delete from backtick_recurring where id = :id
 
--- name: cron-upsert-interval
--- Update the interval on an existing cron element or insert a new one
+-- name: recurring-upsert-interval
+-- Update the interval on an existing recurring job or insert a new one
 select backtick_upsert_interval(:name, :interval, :next);
 
--- name: cron-next
--- Get the next cron entry to run
-update backtick_cron bc
+-- name: recurring-next
+-- Get the next recurring job to run
+update backtick_recurring br
 set    next = :next
 from (
    select id
-   from   backtick_cron
+   from   backtick_recurring
    where  next < :now
    limit  1
    for update
    ) sub
-where  bc.id = sub.id
-returning bc.*;
+where  br.id = sub.id
+returning br.*;
