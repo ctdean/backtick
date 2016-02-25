@@ -20,9 +20,9 @@ returning bq.*;
 -- name: queue-insert<!
 -- Insert a new job element
 insert into backtick_queue
-  (name, priority, state, data, run_at, started_at, created_at, updated_at)
+  (name, priority, state, tries, data, run_at, started_at, created_at, updated_at)
 values
-  (:name, :priority, :state, :data, :run_at, now(), now(), now());
+  (:name, :priority, :state, :tries, :data, :run_at, now(), now(), now());
 
 -- name: queue-finish!
 -- Mark a job as finished

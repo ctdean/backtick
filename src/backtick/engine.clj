@@ -34,6 +34,7 @@
                       :priority (to-sql-time (t/now))
                       :run_at (to-sql-time time)
                       :state "queued"
+                      :tries 0
                       :data (prn-str data)}))
 
 (def workers (atom {}))
@@ -132,6 +133,7 @@
                                              :state "running"
                                              :priority (to-sql-time (t/now))
                                              :run_at nil
+                                             :tries 1
                                              :data (prn-str [])})]
             (db/cron-update-next! (-> (select-keys payload [:id])
                                       (assoc :next next)))

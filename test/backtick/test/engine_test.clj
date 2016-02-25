@@ -15,6 +15,7 @@
     (is (= (dissoc @spy :priority :run_at)
            {:name "foo"
             :state "queued"
+            :tries 0
             :data "{:bar \"baz\", :quux 123, :flim :flam}\n"}))
     (is (t/within? (t/interval now (t/plus now (t/seconds 1)))
                    (tc/from-sql-time (@spy :priority))))
