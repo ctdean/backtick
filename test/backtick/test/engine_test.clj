@@ -15,7 +15,7 @@
   (let [upsert-spy (atom nil)
         delete-spy (atom nil)]
     (with-redefs [backtick.db/recurring-upsert-interval
-                  #(reset! upsert-spy (:interval %))
+                  #(reset! upsert-spy [(:interval %) (:cronspec %)])
                   backtick.db/recurring-delete!
                   #(reset! delete-spy (:name %))
                   backtick.conf/master-cf {:recurring-resolution-ms 49}]
@@ -28,11 +28,27 @@
         (is (= @delete-spy "foo")))
       (testing "interval below recurring resolution"
         (engine/recurring-add "foo" 1)
-        (is (= @upsert-spy 49))
+        (is (= @upsert-spy [49 nil]))
         (reset! upsert-spy nil))
       (testing "interval ok"
         (engine/recurring-add "foo" 1234)
-        (is (= @upsert-spy 1234))))))
+        (is (= @upsert-spy [1234 nil]))))))
+
+(deftest recurring-add-cronspec-test
+  (let [upsert-spy (atom nil)
+        delete-spy (atom nil)]
+    (with-redefs [backtick.db/recurring-upsert-interval
+                  #(reset! upsert-spy [(:interval %) (:cronspec %)])
+                  backtick.db/recurring-delete!
+                  #(reset! delete-spy (:name %))
+                  backtick.conf/master-cf {:recurring-resolution-ms 49}]
+      (testing "invalid cronspec"
+        (is (thrown? Exception
+                     (engine/recurring-add-cronspec "foo" "xxxxx")))
+        (is (nil? @upsert-spy)))
+      (testing "cronspec ok"
+        (engine/recurring-add-cronspec "foo" "0 0 * * * *")
+        (is (= @upsert-spy [nil "0 0 * * * *"]))))))
 
 (deftest add-test
   (let [spy (atom {})

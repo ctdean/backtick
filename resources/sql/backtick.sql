@@ -82,7 +82,7 @@ delete from backtick_recurring where name = :name
 
 -- name: recurring-upsert-interval
 -- Update the interval on an existing recurring job or insert a new one
-select backtick_upsert_interval(:name, :interval, :next);
+select backtick_upsert_interval(:name, :interval, :cronspec, :next);
 
 -- name: recurring-next
 -- Get the next recurring job to run

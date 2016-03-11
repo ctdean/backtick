@@ -56,25 +56,56 @@
   (let [nm (str "test-worker-" (rand-int 100))
         missing (str "missing-worker-" (rand-int 100))
         tag (rand-int 100)]
-    ;; new job
-    (register nm (fn [] tag))
-    (schedule-recurring 98700 nm)
-    (let [cf (get (registered-workers) nm)
-          rec1 (get (engine/recurring-map) nm)]
-      (is (= tag (cf)))
-      (is (nil? (get (registered-workers) missing)))
-      (is (= 98700 (:interval rec1))))
-    ;; new interval
-    (register nm (fn [] (inc tag)))
-    (schedule-recurring 98701 nm)
-    (let [cf (get (registered-workers) nm)
-          rec2 (get (engine/recurring-map) nm)]
-      (is (= (inc tag) (cf)))
-      (is (= 98701 (:interval rec2)))
-      ;; same interval
-      (register nm (fn [] (+ tag 2)))
+    (testing "new job"
+      (register nm (fn [] tag))
+      (schedule-recurring 98700 nm)
+      (let [cf (get (registered-workers) nm)
+            rec1 (get (engine/recurring-map) nm)]
+        (is (= tag (cf)))
+        (is (nil? (get (registered-workers) missing)))
+        (is (= 98700 (:interval rec1)))
+        (is (nil? (:cronspec rec1)))))
+    (testing "new interval"
+      (register nm (fn [] (inc tag)))
       (schedule-recurring 98701 nm)
       (let [cf (get (registered-workers) nm)
-            rec3 (get (engine/recurring-map) nm)]
-        (is (= (+ tag 2) (cf)))
-        (is (= rec2 rec3))))))
+            rec2 (get (engine/recurring-map) nm)]
+        (is (= (inc tag) (cf)))
+        (is (= 98701 (:interval rec2)))
+        (is (nil? (:cronspec rec2)))
+        (testing "same interval"
+          (register nm (fn [] (+ tag 2)))
+          (schedule-recurring 98701 nm)
+          (let [cf (get (registered-workers) nm)
+                rec3 (get (engine/recurring-map) nm)]
+            (is (= (+ tag 2) (cf)))
+            (is (= rec2 rec3))))))))
+
+(deftest schedule-cron-test
+  (let [nm (str "test-worker-" (rand-int 100))
+        missing (str "missing-worker-" (rand-int 100))
+        tag (rand-int 100)]
+    (testing "new job"
+      (register nm (fn [] tag))
+      (schedule-cron "0 0 0 * * *" nm)
+      (let [cf (get (registered-workers) nm)
+            rec1 (get (engine/recurring-map) nm)]
+        (is (= tag (cf)))
+        (is (nil? (get (registered-workers) missing)))
+        (is (nil? (:interval rec1)))
+        (is (= "0 0 0 * * *" (:cronspec rec1)))))
+    (testing "new cronspec"
+      (register nm (fn [] (inc tag)))
+      (schedule-cron "0 1 2 * * *" nm)
+      (let [cf (get (registered-workers) nm)
+            rec2 (get (engine/recurring-map) nm)]
+        (is (= (inc tag) (cf)))
+        (is (nil? (:interval rec2)))
+        (is (= "0 1 2 * * *" (:cronspec rec2)))
+        (testing "same cronspec"
+          (register nm (fn [] (+ tag 2)))
+          (schedule-cron "0 1 2 * * *" nm)
+          (let [cf (get (registered-workers) nm)
+                rec3 (get (engine/recurring-map) nm)]
+            (is (= (+ tag 2) (cf)))
+            (is (= rec2 rec3))))))))
