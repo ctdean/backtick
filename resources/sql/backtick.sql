@@ -55,7 +55,7 @@ where id = :id and state = 'running'
 
 -- name: queue-delete-old-jobs!
 -- Delete very old jobs
-delete from backtick_queue where finished_at > :finished
+delete from backtick_queue where finished_at < :finished
 
 -- name: recurring-update-next!
 -- Update the next runtime for an existing recurring job
