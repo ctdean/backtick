@@ -3,7 +3,7 @@
   (:require
    [backtick.conf :refer [master-cf]]
    [backtick.db :as db]
-   [clj-time.core :as time]
+   [clj-time.core :as t]
    [clj-time.coerce :refer [to-sql-time]]
    [clojure.tools.logging :as log]
    [iter.core :refer [iter iter!]]))
@@ -37,8 +37,7 @@
 (defn- revive-priority [tries]
   (let [[lo hi] (revive-range-ms tries)
         p (+ lo (rand-int (- hi lo)))]
-    (to-sql-time
-     (time/plus (time/now) (time/millis p)))))
+    (to-sql-time (t/plus (t/now) (t/millis p)))))
 
 (defn revive-one-job
   "Requeue a job to be run later"
@@ -55,9 +54,9 @@
 (defn revive
   "Revive jobs that never finished.  Will be run from a backtick job."
   []
-  (let [t (to-sql-time (time/minus (time/now)
-                                   (time/millis (* 2 (:timeout-ms master-cf)))))
-        killed (db/queue-killed-jobs {:killtime t})]
+  (let [time (to-sql-time (t/minus (t/now)
+                                   (t/millis (* 2 (:timeout-ms master-cf)))))
+        killed (db/queue-killed-jobs {:killtime time})]
     (iter! (foreach payload killed)
            (revive-one-job (:id payload) (:tries payload)))))
 
@@ -68,6 +67,6 @@
 (defn remove-old
   "Remove old successful jobs from the database."
   []
-  (let [t (to-sql-time (time/plus (time/now)
-                                  (time/millis (:max-completed-ms master-cf))))]
-    (db/queue-delete-old-jobs! {:finished t})))
+  (let [time (to-sql-time (t/minus (t/now)
+                                   (t/millis (:max-completed-ms master-cf))))]
+    (db/queue-delete-old-jobs! {:finished time})))

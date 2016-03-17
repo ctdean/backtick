@@ -7,15 +7,17 @@
    [backtick.cleaner :as cleaner]
    [backtick.db :as db]))
 
-(def now        (tc/to-sql-time (t/now)))
-(def previously (tc/to-sql-time (t/minus (t/now) (t/hours 1))))
+(def now   (tc/to-sql-time (t/now)))
+(def prev  (tc/to-sql-time (t/minus (t/now) (t/hours 1))))
+(def prev2 (tc/to-sql-time (t/minus (t/now) (t/days 8))))
 
 (def backtick-queue-rows
-  [[:id :name :priority :state :tries :data :started_at :created_at :updated_at]
-   [301 "j1" previously "running" 1 "[]\n" previously previously previously]
-   [302 "j2" previously "queued" 1 "[]\n" previously previously previously]
-   [303 "j3" previously "running" Integer/MAX_VALUE "[]\n" previously previously previously]
-   [304 "j4" previously "running" 2 "[]\n" previously previously previously]
+  [[:id :name :priority :state :tries :data :started_at :finished_at :created_at :updated_at]
+   [300 "j0" prev2 "done" 1 "[]\n" prev2 prev2 prev2 prev2]
+   [301 "j1" prev "running" 1 "[]\n" prev nil prev prev]
+   [302 "j2" prev "queued" 1 "[]\n" prev nil prev prev]
+   [303 "j3" prev "running" Integer/MAX_VALUE "[]\n" prev nil prev prev]
+   [304 "j4" prev "running" 2 "[]\n" prev nil prev prev]
    ])
 
 (defn drain-queue []
@@ -27,7 +29,7 @@
   (f)
   (drain-queue))
 
-(use-fixtures :once db-fixtures)
+(use-fixtures :each db-fixtures)
 
 (deftest revive-one-job-test
   ;; Just in case revive already ran
@@ -55,10 +57,16 @@
     (is (not (:finished_at j1)))
     ;; j2
     (is (= (:state j2) "queued"))
-    (is (= (:priority j2) previously))
-    (is (= (:updated_at j2) previously))
+    (is (= (:priority j2) prev))
+    (is (= (:updated_at j2) prev))
     (is (not (:finished_at j2)))
     ;; j3
     (is (= (:state j3) "exceeded"))
-    (is (:finished_at j3))
-    ))
+    (is (:finished_at j3))))
+
+(deftest remove-old-test
+  (cleaner/remove-old)
+  (is (= (range 301 305)
+         (->> (jdbc/query db/spec "SELECT * FROM backtick_queue")
+              (map :id)
+              sort))))
