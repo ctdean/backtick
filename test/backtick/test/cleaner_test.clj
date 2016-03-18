@@ -32,16 +32,16 @@
 (use-fixtures :each db-fixtures)
 
 (deftest revive-one-job-test
-  ;; Just in case revive already ran
-  (jdbc/execute! db/spec ["UPDATE backtick_queue SET state = 'running' WHERE id = 304"])
-  (let [[before] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")]
+  (let [[before] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")
+        now (t/now)]
     (cleaner/revive-one-job 304)
     (let [[after] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")]
       (is (= 304 (:id before) (:id after)))
       (is (= "running" (:state before)))
       (is (= "queued" (:state after)))
       (is (= (:tries before) (:tries after)))
-      (is (.before (:priority before) (:priority after)))))
+      (is (.before (:priority before) (:priority after)))
+      (is (.before (tc/to-sql-time now) (:run_at after)))))
   ;; Missing job should not throw an error
   (cleaner/revive-one-job -1))
 
