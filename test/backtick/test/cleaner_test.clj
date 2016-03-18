@@ -40,8 +40,7 @@
       (is (= "running" (:state before)))
       (is (= "queued" (:state after)))
       (is (= (:tries before) (:tries after)))
-      (is (.before (:priority before) (:priority after)))
-      (is (.before (tc/to-sql-time now) (:run_at after)))))
+      (is (.before (:priority before) (:priority after)))))
   ;; Missing job should not throw an error
   (cleaner/revive-one-job -1))
 

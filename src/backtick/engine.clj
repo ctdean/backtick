@@ -31,8 +31,7 @@
   [time name data]
   (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
   (db/queue-insert<! {:name name
-                      :priority (to-sql-time (t/now))
-                      :run_at (to-sql-time time)
+                      :priority (to-sql-time time)
                       :state "queued"
                       :tries 0
                       :data (prn-str data)}))
@@ -133,7 +132,6 @@
                 inserted (db/queue-insert<! {:name (:name payload)
                                              :state "running"
                                              :priority (to-sql-time (t/now))
-                                             :run_at nil
                                              :tries 1
                                              :data (prn-str [])})]
             (db/recurring-update-next! (-> (select-keys payload [:id])
