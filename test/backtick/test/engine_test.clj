@@ -12,14 +12,12 @@
         run-at (t/plus now (t/hours 1))]
     (with-redefs [backtick.db/queue-insert<! #(reset! spy %)]
       (engine/add run-at "foo" {:bar "baz" :quux 123 :flim :flam}))
-    (is (= (dissoc @spy :priority :run_at)
+    (is (= (dissoc @spy :priority)
            {:name "foo"
             :state "queued"
             :tries 0
             :data "{:bar \"baz\", :quux 123, :flim :flam}\n"}))
-    (is (t/within? (t/interval now (t/plus now (t/seconds 1)))
-                   (tc/from-sql-time (@spy :priority))))
-    (is (= (@spy :run_at) (tc/to-sql-time run-at))))
+    (is (= (@spy :priority) (tc/to-sql-time run-at))))
   (let [inserted (engine/add (t/now) "foo" [1 2 3])]
     (is (= 0 (:tries inserted)))
     (is (:started_at inserted))

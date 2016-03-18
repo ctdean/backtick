@@ -66,7 +66,7 @@
   "Schedule a job on the Backtick queue to be run as soon as possible. Worker can be
    either the worker's registered name or a reference to the worker function itself."
   [worker & args]
-  (apply schedule-at nil worker args))
+  (apply schedule-at (t/now) worker args))
 
 (defn schedule-recurring
   "Schedule a job to be run on the Backtick queue on a recurring basis, every msec
