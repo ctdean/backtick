@@ -4,7 +4,6 @@
    [backtick.conf :refer [master-cf]]
    [backtick.cleaner :as cleaner]
    [backtick.engine :as engine]
-   [clj-time.core :as t]
    [clojure.tools.logging :as log])
   (:gen-class))
 
@@ -59,6 +58,7 @@
   "Schedule a job on the Backtick queue to be run at the appointed time. Worker can be
    either the worker's registered name or a reference to the worker function itself."
   [time worker & args]
+  ;; Implementation detail: A priority of NULL means (now).
   (when-let [name (resolve-worker worker)]
     (engine/add time name args)))
 
