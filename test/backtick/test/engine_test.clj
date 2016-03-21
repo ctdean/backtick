@@ -20,7 +20,7 @@
     (is (= (@spy :priority) (tc/to-sql-time run-at))))
   (let [inserted (engine/add (t/now) "foo" [1 2 3])]
     (is (= 0 (:tries inserted)))
-    (is (:started_at inserted))
+    (is (nil? (:started_at inserted)))
     (is (> (:id inserted) 0))
     (is (= "queued" (:state inserted)))
     (is (= "[1 2 3]\n" (:data inserted)))))
