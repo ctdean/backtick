@@ -32,9 +32,8 @@
 (use-fixtures :each db-fixtures)
 
 (deftest revive-one-job-test
-  ;; Just in case revive already ran
-  (jdbc/execute! db/spec ["UPDATE backtick_queue SET state = 'running' WHERE id = 304"])
-  (let [[before] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")]
+  (let [[before] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")
+        now (t/now)]
     (cleaner/revive-one-job 304)
     (let [[after] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")]
       (is (= 304 (:id before) (:id after)))

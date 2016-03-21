@@ -9,7 +9,7 @@ set    state = 'running',
 from (
    select id
    from backtick_queue
-   where state = 'queued' and (run_at is null or run_at >= now())
+   where state = 'queued' and priority <= now()
    order by priority
    limit 1
    for update
@@ -20,9 +20,9 @@ returning bq.*;
 -- name: queue-insert<!
 -- Insert a new job element
 insert into backtick_queue
-  (name, priority, state, tries, data, run_at, started_at, created_at, updated_at)
+  (name, priority, state, tries, data, started_at, created_at, updated_at)
 values
-  (:name, :priority, :state, :tries, :data, :run_at, now(), now(), now());
+  (:name, coalesce(:priority, now()), :state, :tries, :data, now(), now(), now());
 
 -- name: queue-finish!
 -- Mark a job as finished
@@ -49,9 +49,11 @@ where id = :id and state = 'running'
 
 -- name: queue-requeue-job!
 -- Put a job back in the queue that did not finish
-update backtick_queue
-set state = 'queued', priority = :priority, updated_at = now()
-where id = :id and state = 'running'
+UPDATE backtick_queue
+SET state = 'queued',
+    priority = :priority,
+    updated_at = now()
+WHERE id = :id AND state = 'running'
 
 -- name: queue-delete-old-jobs!
 -- Delete very old jobs

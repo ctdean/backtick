@@ -53,7 +53,6 @@
   (schedule schedule-test-job-1 88)
   (schedule my-test-worker 2 3)
   (let [jobs (db-query-bt-queue)]
-    (is (every? (comp nil? :run_at) jobs))
     (is (= [nil [88] [2 3]] (->> jobs (map :data) (map edn/read-string))))))
 
 (deftest schedule-at-test
@@ -66,7 +65,7 @@
     (schedule-at later schedule-test-job-1 88)
     (schedule-at laterer my-test-worker 2 3)
     (let [jobs (db-query-bt-queue)]
-      (is (= (map tc/to-sql-time [now later laterer]) (map :run_at jobs)))
+      (is (= (map tc/to-sql-time [now later laterer]) (map :priority jobs)))
       (is (= [nil [88] [2 3]] (->> jobs (map :data) (map edn/read-string)))))))
 
 (deftest schedule-recurring-test
