@@ -18,6 +18,7 @@
    [302 "j2" prev "queued" 1 "[]\n" prev nil prev prev]
    [303 "j3" prev "running" Integer/MAX_VALUE "[]\n" prev nil prev prev]
    [304 "j4" prev "running" 2 "[]\n" prev nil prev prev]
+   [305 "j5" prev2 "canceled" 0 "[]\n" prev2 prev2 prev2 prev2]
    ])
 
 (defn drain-queue []

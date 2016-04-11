@@ -200,3 +200,9 @@
     (fn []
       (reset! keep-running-queue? false)
       @t)))
+
+(defn cancel-all
+  "Cancels all queued jobs so that they will never run.
+   Be careful, this is dangerous!"
+  []
+  (db/queue-cancel-all-jobs!))

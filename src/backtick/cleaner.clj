@@ -65,7 +65,7 @@
 ;;;
 
 (defn remove-old
-  "Remove old successful jobs from the database."
+  "Remove old successful and canceled jobs from the database."
   []
   (let [time (to-sql-time (t/minus (t/now)
                                    (t/millis (:max-completed-ms master-cf))))]
