@@ -1,4 +1,3 @@
-
 -- name: queue-pop
 -- Pop the top element off the backtick queue
 update backtick_queue bq
@@ -55,9 +54,17 @@ SET state = 'queued',
     updated_at = now()
 WHERE id = :id AND state = 'running'
 
+-- name: queue-cancel-all-jobs!
+-- Cancel all queued jobs so that they won't run.
+UPDATE backtick_queue
+SET state = 'canceled', updated_at = now()
+WHERE state = 'queued'
+
 -- name: queue-delete-old-jobs!
--- Delete very old jobs
-delete from backtick_queue where finished_at < :finished
+-- Delete very old jobs.
+DELETE FROM backtick_queue
+WHERE (state = 'done' AND finished_at < :finished) OR
+      (state = 'canceled' AND updated_at < :finished)
 
 -- name: recurring-update-next!
 -- Update the next runtime for an existing recurring job

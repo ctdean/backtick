@@ -1,10 +1,14 @@
 (ns backtick.test.engine-test
   (:require
+   [backtick.db :as db]
+   [backtick.engine :as engine]
+   [backtick.test.fixtures :refer [wrap-clean-data]]
    [clj-time.coerce :as tc]
    [clj-time.core :as t]
    [clojure.core.async :refer [<!! chan thread]]
-   [clojure.test :refer :all]
-   [backtick.engine :as engine]))
+   [clojure.test :refer :all]))
+
+(use-fixtures :each wrap-clean-data)
 
 (deftest add-test
   (let [spy (atom {})
@@ -40,3 +44,11 @@
     (is (= (<!! ch) :done))
     (is (first @foobar-called))
     (is (= (second @foobar-called) [:x :y]))))
+
+(deftest cancel-all-test
+  (dotimes [n 3] (engine/add (t/now) "foo" [n]))
+  (let [job (first (db/queue-pop))]
+    (is (= "foo" (:name job)))
+    (is (= "[0]\n" (:data job))))
+  (engine/cancel-all)
+  (is (empty? (db/queue-pop))))
