@@ -12,7 +12,7 @@
   "Schedule a job on the Backtick queue to be run at the appointed time. Worker can be
    either the worker's registered name or a reference to the worker function itself."
   [time worker & args]
-  ;; Implementation detail: A priority of NULL means (now).
+  ;; Implementation detail: A priority of nil means now.
   (when-let [name (resolve-worker->name worker)]
     (engine/add time name args)))
 
@@ -23,9 +23,11 @@
   (apply schedule-at nil worker args))
 
 (defn schedule-recurring
-  "Schedule a job to be run on the Backtick queue on a recurring basis, every msec
-   milliseconds, starting for the first time msec milliseconds from now. Worker can be
-   either the worker's registered name or a reference to the worker function itself."
+  "Schedule a job to be run on the Backtick queue on a recurring basis, every
+   msec milliseconds, starting for the first time msec milliseconds from now.
+   Worker can be either the worker's registered name or a reference to the
+   worker function itself. If msec is set to zero the job will be considered
+   disabled and will not be run."
   [msec worker & args]
   (assert (empty? args) "Recurring jobs may not take arguments.")
   (when-let [name (resolve-worker->name worker)]

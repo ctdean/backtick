@@ -11,6 +11,25 @@
 
 (use-fixtures :each wrap-clean-data)
 
+(deftest recurring-add-test
+  (let [spy (atom nil)]
+    (with-redefs [backtick.db/recurring-upsert-interval
+                  #(reset! spy (:interval %))
+                  backtick.conf/master-cf {:recurring-resolution-ms 49}]
+      (testing "invalid interval"
+        (is (thrown? AssertionError (engine/recurring-add "foo" "0")))
+        (is (nil? @spy)))
+      (testing "zero interval - job disabled"
+        (engine/recurring-add "foo" 0)
+        (is (nil? @spy)))
+      (testing "interval below recurring resolution"
+        (engine/recurring-add "foo" 1)
+        (is (= @spy 49))
+        (reset! spy nil))
+      (testing "interval ok"
+        (engine/recurring-add "foo" 1234)
+        (is (= @spy 1234))))))
+
 (deftest add-test
   (let [spy (atom {})
         now (t/now)

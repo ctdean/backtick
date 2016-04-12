@@ -15,11 +15,18 @@
 
 (defn recurring-add
   "Add a recurring job to the database. The job is started for the first time
-   interval ms from now."
+   interval ms from now. An interval value of zero indicates that the job is
+   disabled and will never run."
   [name interval]
-  (let [real-interval (max (:recurring-resolution-ms master-cf) interval)
+  (assert (and (number? interval) (<= 0 interval)
+               "interval must be a non-negative number"))
+  (let [enabled (not= 0 interval)
+        real-interval (max (:recurring-resolution-ms master-cf) interval)
         next (to-sql-time (t/plus (t/now) (t/millis real-interval)))]
-    (db/recurring-upsert-interval {:name name :interval (int real-interval) :next next})))
+    (when enabled
+      (db/recurring-upsert-interval {:name name
+                                     :interval (int real-interval)
+                                     :next next}))))
 
 (defn recurring-map
   "All the recurring jobs as a map."
