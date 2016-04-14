@@ -12,7 +12,8 @@
 (def prev2 (tc/to-sql-time (t/minus (t/now) (t/days 8))))
 
 (def backtick-queue-rows
-  [[:id :name :priority :state :tries :data :started_at :finished_at :created_at :updated_at]
+  [[:id :name :priority :state :tries :data
+    :started_at :finished_at :created_at :updated_at]
    [300 "j0" prev2 "done" 1 "[]\n" prev2 prev2 prev2 prev2]
    [301 "j1" prev "running" 1 "[]\n" prev nil prev prev]
    [302 "j2" prev "queued" 1 "[]\n" prev nil prev prev]
@@ -47,9 +48,10 @@
 
 (deftest revive-test
   (cleaner/revive)
-  (let [[j1 j2 j3] (jdbc/query
-                    db/spec
-                    "SELECT * FROM backtick_queue WHERE id in (301, 302, 303) ORDER BY id ASC")]
+  (let [[j1 j2 j3]
+        (jdbc/query
+         db/spec
+         "SELECT * FROM backtick_queue WHERE id in (301, 302, 303) ORDER BY id ASC")]
     ;; j1
     (is (= (:state j1) "queued"))
     (is (.after (:priority j1) now))
