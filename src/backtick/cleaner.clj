@@ -34,7 +34,10 @@
          (let [[low hi] (revive-range-ms tries)]
            (printf "%2d %12s %12s\n" tries (time-unit low) (time-unit hi)))))
 
-(defn- revive-at [tries]
+(defn- revive-at
+  "The time at which to revive the failed job.  Notice that we pick a
+   random start time between a low and high range."
+  [tries]
   (let [[lo hi] (revive-range-ms tries)
         p (+ lo (rand-int (- hi lo)))]
     (to-sql-time (t/plus (t/now) (t/millis p)))))
@@ -49,7 +52,7 @@
    (if (exceeded? tries)
      (db/queue-abort-job! {:id id})
      (db/queue-requeue-job! {:id id
-                             :priority (to-sql-time (t/now))}))))
+                             :priority (revive-at tries)}))))
 
 (defn revive
   "Revive jobs that never finished.  Will be run from a backtick job."
