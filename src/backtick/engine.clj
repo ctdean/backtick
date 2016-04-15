@@ -23,10 +23,14 @@
   (let [enabled (not= 0 interval)
         real-interval (max (:recurring-resolution-ms master-cf) interval)
         next (to-sql-time (t/plus (t/now) (t/millis real-interval)))]
-    (when enabled
+    (if enabled
       (db/recurring-upsert-interval {:name name
                                      :interval (int real-interval)
-                                     :next next}))))
+                                     :next next})
+      ;; I know it's strange to delete a job in a function called "add",
+      ;; but this ensures that a newly disabled recurring job's old
+      ;; database entry is disabled to match.
+      (db/recurring-delete! {:name name}))))
 
 (defn recurring-map
   "All the recurring jobs as a map."
