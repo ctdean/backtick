@@ -2,6 +2,7 @@
   (:require
    [backtick.db :as db]
    [backtick.engine :as engine]
+   [backtick.registry :as registery]
    [backtick.test.fixtures :refer [wrap-clean-data]]
    [clj-time.coerce :as tc]
    [clj-time.core :as t]
@@ -38,9 +39,10 @@
         ch (chan 1)
         msg {:id 12345 :name "foobar" :data [:x :y]}
         foobar-called (atom [])
-        workers (atom {"foobar" (fn [& args] (reset! foobar-called [engine/*job-id* args]))})]
-    (thread (with-redefs [engine/workers workers]
-      (engine/submit-worker pool ch msg)))
+        runner (fn [& args] (reset! foobar-called [engine/*job-id* args]))
+        resolver (fn [_] runner)]
+    (thread (with-redefs [registery/resolve-worker->fn resolver]
+              (engine/submit-worker pool ch msg)))
     (is (= (<!! ch) :done))
     (is (first @foobar-called))
     (is (= (second @foobar-called) [:x :y]))))

@@ -1,6 +1,7 @@
 (ns backtick.test.prop-test
   (:require
    [backtick.core :as bt]
+   [backtick.registry :as registry]
    [clojure.core.async :refer [alts!! chan go timeout <!! >!! <! >!]]
    [clojure.test :refer :all]
    [clojure.test.check.clojure-test :refer :all]
@@ -27,7 +28,7 @@
                 (log/infof "TEST exec-worker %s" val)
                 (swap! state conj (inc val))
                 (>!! ch val))]
-        (bt/register name f)
+        (registry/register name f)
         (iter* (foreach i ints)
                (bt/schedule f i))
         (let [done (chan)]
@@ -36,7 +37,7 @@
                    (<!! ch))
             (>! done :done))
           (alts!! [done (timeout 10000)])))
-      (finally (bt/unregister name)))
+      (finally (registry/unregister name)))
     @state))
 
 (defspec exec-test
@@ -48,6 +49,6 @@
 (deftest higher-arity-test
   (let [p (promise)
         worker (fn [a b c] (deliver p (/ (+ a b) c)))]
-    (bt/register "higher-arity-worker" worker)
+    (registry/register "higher-arity-worker" worker)
     (bt/schedule worker 3 7 5)
     (is (= @p 2))))

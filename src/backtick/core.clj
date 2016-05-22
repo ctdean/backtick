@@ -4,62 +4,16 @@
    [backtick.conf :refer [master-cf]]
    [backtick.cleaner :as cleaner]
    [backtick.engine :as engine]
+   [backtick.registry :refer [resolve-worker->name register]]
    [clojure.tools.logging :as log])
   (:gen-class))
-
-(defn register
-  "Registers a Backtick worker. Workers must be registered in order to run jobs.
-   The worker may be referenced in future calls by its unique name string."
-  [name f]
-  (assert (string? name) "Worker name must be a string.")
-  ;; We store both the name => fn mapping (needed by submit-worker)
-  ;; and fn => name mapping (needed by schedule)
-  (swap! engine/workers assoc
-         name f
-         f name)
-  name)
-
-(defn unregister
-  "Unregisters a Backtick worker."
-  [name]
-  (swap! engine/workers dissoc name (@engine/workers name))
-  name)
-
-(defn registered-workers
-  "Returns a map of all registered workers, keyed by name."
-  []
-  (->> @engine/workers
-       (filter #(string? (key %)))
-       (into {})))
-
-(defn recurring-jobs
-  "Returns a map of all recurring jobs, keyed by name."
-  []
-  (engine/recurring-map))
-
-(defn- resolve-worker [worker]
-  (let [v (@engine/workers worker)]
-    (cond
-      (string? v) v
-      (fn? v)     worker
-      (nil? v)    (do
-                    (log/errorf (str "Worker %s not registered. Call register on this "
-                                     "function before attempting to schedule it.")
-                                worker)
-                    nil)
-      :else       (do
-                    (log/errorf (str "Unexpected value %s for worker %s in map.
-                                     Scheduling failed.")
-                                v
-                                worker)
-                    nil))))
 
 (defn schedule-at
   "Schedule a job on the Backtick queue to be run at the appointed time. Worker can be
    either the worker's registered name or a reference to the worker function itself."
   [time worker & args]
   ;; Implementation detail: A priority of NULL means (now).
-  (when-let [name (resolve-worker worker)]
+  (when-let [name (resolve-worker->name worker)]
     (engine/add time name args)))
 
 (defn schedule
@@ -74,7 +28,7 @@
    either the worker's registered name or a reference to the worker function itself."
   [msec worker & args]
   (assert (empty? args) "Recurring jobs may not take arguments.")
-  (when-let [name (resolve-worker worker)]
+  (when-let [name (resolve-worker->name worker)]
     (engine/recurring-add name msec)))
 
 ;;;

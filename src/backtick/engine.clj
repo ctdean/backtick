@@ -4,6 +4,7 @@
    [backtick.cleaner :as cleaner]
    [backtick.conf :refer [master-cf]]
    [backtick.db :as db]
+   [backtick.registry :refer [resolve-worker->fn]]
    [clj-time.core :as t]
    [clj-time.coerce :refer [to-sql-time to-date-time]]
    [clojure.core.async :as async :refer [chan alts! alts!! >!! <! >! go-loop timeout]]
@@ -36,8 +37,6 @@
                       :tries 0
                       :data (prn-str data)}))
 
-(def workers (atom {}))
-
 (def ^:private factory-counter (atom 0))
 
 (defn- make-thread-factory []
@@ -53,7 +52,7 @@
 
 (defn submit-worker [pool ch msg]
   (let [{id :id name :name data :data} msg
-        f (@workers name)]
+        f (resolve-worker->fn name)]
     (log/debugf "Running job %s %s ..." id name)
     (if f
       (.submit pool (fn [] (try
@@ -121,7 +120,7 @@
   (let [now (t/now)
         window (to-sql-time (t/plus now (t/millis (:recurring-window-ms master-cf))))]
     (when-let [payload (first (db/recurring-next {:now (to-sql-time now) :next window}))]
-      (if (not (@workers (:name payload)))
+      (if (not (resolve-worker->fn (:name payload)))
           (do
             (log/warnf "No worker registered for recurring job %s, removing it!"
                        (:name payload))

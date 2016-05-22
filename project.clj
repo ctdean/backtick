@@ -1,5 +1,5 @@
 (defproject ctdean/backtick
-  "0.6.0"
+  "0.7.0"
   :description "Background job processing for Clojure using Postgres"
   :dependencies
   [

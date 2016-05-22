@@ -2,6 +2,8 @@
   (:require
    [backtick.core :refer :all]
    [backtick.db :as db]
+   [backtick.engine :as engine]
+   [backtick.registry :refer [registered-workers register]]
    [backtick.test.fixtures :refer [wrap-clean-data]]
    [clj-time.core :as t]
    [clj-time.coerce :as tc]
@@ -10,24 +12,6 @@
    [clojure.test :refer :all]))
 
 (use-fixtures :each wrap-clean-data)
-
-(deftest register-test
-  (let [nm (str "test-worker-" (rand-int 100))
-        missing (str "missing-worker-" (rand-int 100))
-        tag (rand-int 100)]
-    (register nm (fn [] tag))
-    (let [cf (get (registered-workers) nm)]
-      (is (= tag (cf)))
-      (is (nil? (get (registered-workers) missing))))))
-
-(deftest registered-workers-test
-  (with-redefs [backtick.engine/workers (atom {})]
-    (let [f1 (fn [] :foo)
-          f2 (fn [] :bar)]
-      (register "foo" f1)
-      (register "bar" f2)
-      (is (= {"foo" f1 "bar" f2}
-             (registered-workers))))))
 
 (def my-atom (atom nil))
 
@@ -76,7 +60,7 @@
     (register nm (fn [] tag))
     (schedule-recurring 98700 nm)
     (let [cf (get (registered-workers) nm)
-          rec1 (get (recurring-jobs) nm)]
+          rec1 (get (engine/recurring-map) nm)]
       (is (= tag (cf)))
       (is (nil? (get (registered-workers) missing)))
       (is (= 98700 (:interval rec1))))
@@ -84,13 +68,13 @@
     (register nm (fn [] (inc tag)))
     (schedule-recurring 98701 nm)
     (let [cf (get (registered-workers) nm)
-          rec2 (get (recurring-jobs) nm)]
+          rec2 (get (engine/recurring-map) nm)]
       (is (= (inc tag) (cf)))
       (is (= 98701 (:interval rec2)))
       ;; same interval
       (register nm (fn [] (+ tag 2)))
       (schedule-recurring 98701 nm)
       (let [cf (get (registered-workers) nm)
-            rec3 (get (recurring-jobs) nm)]
+            rec3 (get (engine/recurring-map) nm)]
         (is (= (+ tag 2) (cf)))
         (is (= rec2 rec3))))))
