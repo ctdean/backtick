@@ -23,9 +23,9 @@ drop:
 
 migrate:
 	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)?user=postgres" \
-	    lein run -m clams.migrate migrate
+	    lein run -m common.db.migrate migrate
 	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)_test?user=postgres" \
-	    lein run -m clams.migrate migrate
+	    lein run -m common.db.migrate migrate
 
 # Nuke the existing databases and recreate
 rebuild: drop init migrate
