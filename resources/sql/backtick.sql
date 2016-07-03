@@ -78,7 +78,7 @@ SELECT * FROM backtick_recurring;
 
 -- name: recurring-delete!
 -- Delete a recurring job
-delete from backtick_recurring where id = :id
+delete from backtick_recurring where name = :name
 
 -- name: recurring-upsert-interval
 -- Update the interval on an existing recurring job or insert a new one
