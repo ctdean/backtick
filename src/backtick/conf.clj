@@ -1,7 +1,6 @@
 (ns backtick.conf
   "@ctdean"
-  (:require
-   [clams.conf :as conf]))
+  (:require [conf.core :as conf]))
 
 (defn- load-config []
   (let [db (conf/get :database-url)

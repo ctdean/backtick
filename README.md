@@ -18,8 +18,7 @@ job runners can be distributed across multiple machines.
 
 ### Database
 
-First configure your Postgres datastore using Clams
-https://github.com/standardtreasury/clams/wiki/Configuration
+First configure your Postgres datastore by running `make rebuild`.
 
 Backtick will read `:bt-database-url` or failing that will use the
 `:database-url` configuration parameter.  For example:
