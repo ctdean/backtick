@@ -7,8 +7,7 @@
    [clojure.test.check.clojure-test :refer :all]
    [clojure.test.check.generators :as gen]
    [clojure.test.check.properties :as prop]
-   [clojure.tools.logging :as log]
-   [iter.core :refer [iter iter*]]))
+   [clojure.tools.logging :as log]))
 
 (defn wrap-run-bt-instance [f]
   (let [runner1 (bt/start)
@@ -29,12 +28,12 @@
                 (swap! state conj (inc val))
                 (>!! ch val))]
         (registry/register name f)
-        (iter* (foreach i ints)
-               (bt/schedule f i))
+        (doseq [i ints]
+          (bt/schedule f i))
         (let [done (chan)]
           (go
-            (iter* (times (count ints))
-                   (<!! ch))
+            (dotimes [_ (count ints)]
+              (<!! ch))
             (>! done :done))
           (alts!! [done (timeout 10000)])))
       (finally (registry/unregister name)))

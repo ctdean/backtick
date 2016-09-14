@@ -5,8 +5,7 @@
    [backtick.db :as db]
    [clj-time.core :as t]
    [clj-time.coerce :refer [to-sql-time]]
-   [clojure.tools.logging :as log]
-   [iter.core :refer [iter iter!]]))
+   [clojure.tools.logging :as log]))
 
 ;;;
 ;;; Revive jobs that never finished.
@@ -30,9 +29,9 @@
 (defn- dump-revive-range
   "Print the possible revive times.  Useful for debugging."
   []
-  (iter! (foreach tries (range 1 (:max-tries master-cf)))
-         (let [[low hi] (revive-range-ms tries)]
-           (printf "%2d %12s %12s\n" tries (time-unit low) (time-unit hi)))))
+  (doseq [tries (range 1 (:max-tries master-cf))]
+    (let [[low hi] (revive-range-ms tries)]
+      (printf "%2d %12s %12s\n" tries (time-unit low) (time-unit hi)))))
 
 (defn- revive-at
   "The time at which to revive the failed job.  Notice that we pick a
@@ -60,8 +59,8 @@
   (let [time (to-sql-time (t/minus (t/now)
                                    (t/millis (* 2 (:timeout-ms master-cf)))))
         killed (db/queue-killed-jobs {:killtime time})]
-    (iter! (foreach payload killed)
-           (revive-one-job (:id payload) (:tries payload)))))
+    (doseq [payload killed]
+      (revive-one-job (:id payload) (:tries payload)))))
 
 ;;;
 ;;; Remove old jobs
