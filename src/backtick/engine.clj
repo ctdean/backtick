@@ -10,7 +10,7 @@
    [clojure.core.async :as async :refer [chan alts! alts!! >!! <! >! go-loop timeout]]
    [clojure.edn :as edn]
    [clojure.tools.logging :as log]
-   [iter.core :refer [iter iter*]])
+)
   (:import java.util.concurrent.Executors))
 
 (defn recurring-add
@@ -35,8 +35,9 @@
 (defn recurring-map
   "All the recurring jobs as a map."
   []
-  (iter (foreach job (db/recurring-all))
-        (collect-map (:name job) job)))
+  (->> (db/recurring-all)
+       (map #(vector (:name %) %))
+       (into {})))
 
 (defn add
   "Add a job to the queue"
@@ -83,29 +84,29 @@
 
 (defn- start-runners [pool pool-size job-ch]
   (log/debugf "start-runners")
-  (iter* (foreach r (range pool-size))
-         (go-loop []
-           (let [msg (<! job-ch)]
-             (condp = msg
-               :ping (do
-                       (log/debugf "runner %s ready" r)
-                       (recur))
-               :stop (log/debugf "runner %s stop" r)
-               (let [done-ch (chan 1)
-                     worker (submit-worker pool done-ch msg)
-                     [done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
-                 (if done?
-                   (db/queue-finish! (select-keys msg [:id]))
-                   (do
-                     (when worker
-                       (.cancel worker true))
-                     (log/infof "runner %s timed out job: %s %s"
-                                r
-                                (:id msg)
-                                (:name msg))
-                     (cleaner/revive-one-job (:id msg))))
-                 (log/debugf "start-runners: waiting")
-                 (recur)))))))
+  (doseq [r (range pool-size)]
+    (go-loop []
+      (let [msg (<! job-ch)]
+        (condp = msg
+          :ping (do
+                  (log/debugf "runner %s ready" r)
+                  (recur))
+          :stop (log/debugf "runner %s stop" r)
+          (let [done-ch (chan 1)
+                worker (submit-worker pool done-ch msg)
+                [done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
+            (if done?
+                (db/queue-finish! (select-keys msg [:id]))
+                (do
+                  (when worker
+                    (.cancel worker true))
+                  (log/infof "runner %s timed out job: %s %s"
+                             r
+                             (:id msg)
+                             (:name msg))
+                  (cleaner/revive-one-job (:id msg))))
+            (log/debugf "start-runners: waiting")
+            (recur)))))))
 
 (def ^:private recurring-checked (atom 0))
 
@@ -176,26 +177,25 @@
   "Find available job runner"
   [job-ch keep-running-queue?]
   (when-let [sent? (first (alts!! [[job-ch :ping] (timeout 1000)]))]
-    (iter* (forever)
-           (while @keep-running-queue?)
-           (let [payload (pop-queue)] ; Pop from the queue
-             (if (not payload)        ; Sleep if queue is empty
-                 (Thread/sleep (:poll-ms master-cf))
-                 (do                ; Send the job to be processed
-                   (>!! job-ch (select-keys payload [:data :name :id]))
-                   (break)))))))
+    (loop []
+      (when @keep-running-queue?
+        (let [payload (pop-queue)]    ; Pop from the queue
+          (if payload                 ; Send the job to be processed
+              (>!! job-ch (select-keys payload [:data :name :id]))
+              (do                     ; Sleep if queue is empty
+                (Thread/sleep (:poll-ms master-cf))
+                (recur))))))))
 
 (defn- run-queue
   "Run the master work queue.  This function never returns in normal operation."
   [pool-size job-ch keep-running-queue?]
   (try
-    (iter* (forever)
-           (log/debug "run-queue loop")
-           (while @keep-running-queue?)
-           (process-one-queue job-ch keep-running-queue?))
+    (while @keep-running-queue?
+      (log/debug "run-queue loop")
+      (process-one-queue job-ch keep-running-queue?))
     (finally
-      (iter* (times pool-size)
-             (>!! job-ch :stop)))))
+      (dotimes [_ pool-size]
+        (>!! job-ch :stop)))))
 
 (defn run [pool-size]
   (let [keep-running-queue? (atom true)
