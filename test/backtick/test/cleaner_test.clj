@@ -11,22 +11,23 @@
 (def prev  (tc/to-sql-time (t/minus (t/now) (t/hours 1))))
 (def prev2 (tc/to-sql-time (t/minus (t/now) (t/days 8))))
 
+(def backtick-queue-cols
+  [:id :name :priority :state :tries :data :started_at :finished_at :created_at :updated_at])
+
 (def backtick-queue-rows
-  [[:id :name :priority :state :tries :data :started_at :finished_at :created_at :updated_at]
-   [300 "j0" prev2 "done" 1 "[]\n" prev2 prev2 prev2 prev2]
+  [[300 "j0" prev2 "done" 1 "[]\n" prev2 prev2 prev2 prev2]
    [301 "j1" prev "running" 1 "[]\n" prev nil prev prev]
    [302 "j2" prev "queued" 1 "[]\n" prev nil prev prev]
    [303 "j3" prev "running" Integer/MAX_VALUE "[]\n" prev nil prev prev]
    [304 "j4" prev "running" 2 "[]\n" prev nil prev prev]
-   [305 "j5" prev2 "canceled" 0 "[]\n" prev2 prev2 prev2 prev2]
-   ])
+   [305 "j5" prev2 "canceled" 0 "[]\n" prev2 prev2 prev2 prev2]])
 
 (defn drain-queue []
   (jdbc/delete! db/spec :backtick_queue []))
 
 (defn db-fixtures [f]
   (drain-queue)
-  (apply jdbc/insert! db/spec :backtick_queue backtick-queue-rows)
+  (jdbc/insert-multi! db/spec :backtick_queue backtick-queue-cols backtick-queue-rows)
   (f)
   (drain-queue))
 

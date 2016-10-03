@@ -9,12 +9,11 @@ all: run
 run:
 	lein trampoline run
 
-# Create the tables and link migrations
+# Create the tables
 init:
 	- createuser -s postgres -h localhost
 	- createdb -Upostgres -h localhost $(DATABASE)
 	- createdb -Upostgres -h localhost $(DATABASE)_test
-	- ln -ns backtick/migrations resources/migrations
 
 # Drop the tables
 drop:
@@ -23,9 +22,15 @@ drop:
 
 migrate:
 	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)?user=postgres" \
-	    lein run -m common.db.migrate migrate
+	    lein migrate
 	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)_test?user=postgres" \
-	    lein run -m common.db.migrate migrate
+	    lein migrate
+
+rollback:
+	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)?user=postgres" \
+	    lein rollback
+	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)_test?user=postgres" \
+	    lein rollback
 
 # Nuke the existing databases and recreate
 rebuild: drop init migrate
