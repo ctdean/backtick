@@ -1,8 +1,9 @@
-(defproject ctdean/backtick "0.7.5"
+(defproject ctdean/backtick "0.8.0"
   :description "Background job processing for Clojure using Postgres"
   :dependencies [[clj-time "0.12.0"]
+                 [clj-cron-parse "0.1.4"]
                  [clojure.jdbc/clojure.jdbc-c3p0 "0.3.2"]
-                 [conf "0.9.1" :exclusions [org.clojure/clojure]]
+                 [conf "0.9.1"]
                  [org.clojure/clojure "1.8.0"]
                  [org.clojure/core.async "0.2.391"]
                  [org.clojure/java.jdbc "0.6.1"]

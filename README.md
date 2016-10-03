@@ -10,9 +10,9 @@ job runners can be distributed across multiple machines.
 
 ## Artifacts
 
-`backtick` artifacts are [released to Clojars](https://clojars.org/clj-time/clj-time).
+`backtick` artifacts are [released to Clojars](https://clojars.org/ctdean/backtick).
 
-[![Clojars Project](http://clojars.org/ctdean/backtick/latest-version.svg)](http://clojars.org/ctdean/backtick)
+[![Clojars Project](http://clojars.org/ctdean/backtick/latest-version.svg)](https://clojars.org/ctdean/backtick)
 
 ## Quick start
 
@@ -31,7 +31,7 @@ Backtick will read `:bt-database-url` or failing that will use the
 
 ### Jobs
 
-You configure the jobs using the `define-worker` macro:
+You configure jobs using the `define-worker` macro:
 
 ``` clj
 (require '[backtick.core :as bt])
@@ -48,15 +48,40 @@ and put the job in the queue by calling the `schedule` function:
 (schedule log-sum 88 99)
 ```
 
-You may also run periodic jobs using `define-recurring`
+You may also run periodic jobs using `define-recurring`:
 
 ``` clj
 (bt/define-recurring heartbeat-every-5-minutes (* 1000 60 5) []
   (log/info "heartbeat"))
 ```
 
-Both `define-worker` and `define-recurring` create a regular Clojure
-function of the same name.
+Or if you need you job to run at specific wall clock/calendar times,
+you may use `define-cron`:
+
+```clj
+(bt/define-cron twice-in-the-afternoon "0 0 14,16 * * *" []
+  (log/info "do a thing"))
+```
+
+Backtick depends on the
+[clj-cron-parse library](https://github.com/shmish111/clj-cron-parse)
+to parse Cron specifications. The format is broadly the same as a standard
+crontab, with the addition of seconds in the first position. Briefly:
+
+| field        | allowed values                                           |
+| -----        | --------------                                           |
+| second       | 0-59                                                     |
+| minute       | 0-59                                                     |
+| hour         | 0-23                                                     |
+| day of month | 1-31 L W                                                 |
+| month        | 1-12 (or names)                                          |
+| day of week  | 0-7 (0 or 7 is Sun, or use names) W 1L 2L 3L 4L 5L 6L 7L |
+
+For more details on supported formats, consult
+[clj-cron-parse's documentation](https://github.com/shmish111/clj-cron-parse/blob/master/src/clj_cron_parse/core.clj#L296-L347).
+
+Each of `define-worker`, `define-recurring`, and `define-cron` creates a regular
+Clojure function of the same name.
 
 ### Servers
 
@@ -95,8 +120,8 @@ easily handle our load.
 - At job: A job scheduled to run at a particular time in the future.
 - Recurring job: A job scheduled to run repeatedly after a particular time interval
   has elapsed.
+- Cron job: A job that recurs based on the clock or calendar time.
 - Runner: A process that executes a job.
-- Cron: A job that recurs based on the time.
 
 ## Authors
 

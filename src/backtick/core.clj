@@ -33,6 +33,16 @@
   (when-let [name (resolve-worker->name worker)]
     (engine/recurring-add name msec)))
 
+(defn schedule-cron
+  "Schedule a job to be run on the Backtick queue recurring according
+   to a Cron-style schedule specification ('cronspec'). Worker can be
+   either the worker's registered name or a reference to the worker
+   function itself."
+  [cronspec worker & args]
+  (assert (empty? args) "Cron jobs may not take arguments.")
+  (when-let [name (resolve-worker->name worker)]
+    (engine/recurring-add-cronspec name cronspec)))
+
 ;;;
 ;;; Helpers
 ;;;
@@ -44,14 +54,20 @@
        (defn ~@function-definition)
        (register ~str-nm ~symbol-name))))
 
-(defmacro define-recurring [name interval-ms args & body]
+(defn ^:private define-recurring* [schedulef name intv-or-cs args body]
   (assert (= args []) "Recurring functions may not take arguments.")
   (let [symbol-name name  ; avoid shadowing built-in
         str-nm (str *ns* "/" symbol-name)]
     `(do
        (defn ~symbol-name ~args ~@body)
        (register ~str-nm ~symbol-name)
-       (schedule-recurring ~interval-ms ~symbol-name))))
+       (~schedulef ~intv-or-cs ~symbol-name))))
+
+(defmacro define-recurring [name interval-ms args & body]
+  (define-recurring* schedule-recurring name interval-ms args body))
+
+(defmacro define-cron [name cronspec args & body]
+  (define-recurring* schedule-cron name cronspec args body))
 
 ;;;
 ;;; Cleaners

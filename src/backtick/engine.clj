@@ -5,32 +5,57 @@
    [backtick.conf :refer [master-cf]]
    [backtick.db :as db]
    [backtick.registry :refer [resolve-worker->fn]]
+   [clj-cron-parse.core :as cron]
    [clj-time.core :as t]
    [clj-time.coerce :refer [to-sql-time to-date-time]]
-   [clojure.core.async :as async :refer [chan alts! alts!! >!! <! >! go-loop timeout]]
+   [clojure.core.async :refer [chan alts! alts!! >!! <! >! go-loop timeout]]
    [clojure.edn :as edn]
-   [clojure.tools.logging :as log]
-)
+   [clojure.tools.logging :as log])
   (:import java.util.concurrent.Executors))
+
+(defn- cron-next-date [now cronspec]
+  (let [next (cron/next-date now cronspec)]
+    (if (nil? next)
+      (throw (Exception. (format "Failed to parse cronspec: '%s'" cronspec)))
+      next)))
+
+(defn- recurring-next
+  "Calculates a job's next targeted run time based on
+   its interval or cronspec."
+  [now interval cronspec]
+  (if (nil? interval)
+    (cron-next-date now cronspec)
+    (t/plus now (t/millis interval))))
+
+(defn- recurring-add* [name enabled? interval cronspec]
+  (let [real-interval (when (not (nil? interval))
+                        (int (max (:recurring-resolution-ms master-cf)
+                                  interval)))
+        next (to-sql-time (recurring-next (t/now) interval cronspec))]
+    (if enabled?
+      (db/recurring-upsert-interval {:name name
+                                     :interval real-interval
+                                     :cronspec cronspec
+                                     :next next})
+      ;; I know it's strange to delete a job in a function called "add",
+      ;; but this ensures that a newly disabled recurring job's old
+      ;; database entry is disabled to match.
+      (db/recurring-delete! {:name name}))))
 
 (defn recurring-add
   "Add a recurring job to the database. The job is started for the first time
    interval ms from now. An interval value of zero indicates that the job is
    disabled and will never run."
   [name interval]
-  (assert (and (number? interval) (<= 0 interval)
-               "interval must be a non-negative number"))
-  (let [enabled (not= 0 interval)
-        real-interval (max (:recurring-resolution-ms master-cf) interval)
-        next (to-sql-time (t/plus (t/now) (t/millis real-interval)))]
-    (if enabled
-      (db/recurring-upsert-interval {:name name
-                                     :interval (int real-interval)
-                                     :next next})
-      ;; I know it's strange to delete a job in a function called "add",
-      ;; but this ensures that a newly disabled recurring job's old
-      ;; database entry is disabled to match.
-      (db/recurring-delete! {:name name}))))
+  (assert (and (integer? interval) (<= 0 interval))
+          "interval must be a non-negative integer")
+  (recurring-add* name (not= 0 interval) interval nil))
+
+(defn recurring-add-cronspec
+  "Add a recurring job calculating the appropriate run interval
+   based on a cronspec."
+  [name cronspec]
+  (recurring-add* name true nil cronspec))
 
 (defn recurring-map
   "All the recurring jobs as a map."
@@ -138,8 +163,9 @@
                        (:name payload))
             (db/recurring-delete! payload)
             (pop-recurring-aux))
-          (let [next (to-sql-time (t/plus (to-date-time (:next payload))
-                                          (t/millis (:interval payload))))
+          (let [next (to-sql-time (recurring-next (to-date-time (:next payload))
+                                                  (:interval payload)
+                                                  (:cronspec payload)))
                 inserted (db/queue-insert<! {:name (:name payload)
                                              :state "running"
                                              :priority (to-sql-time (t/now))
