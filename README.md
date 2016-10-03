@@ -65,8 +65,20 @@ you may use `define-cron`:
 
 Backtick depends on the
 [clj-cron-parse library](https://github.com/shmish111/clj-cron-parse)
-to parse Cron specifications. You may refer to its documentation for details
-on valid formats.
+to parse Cron specifications. The format is broadly the same as a standard
+crontab, with the addition of seconds in the first position. Briefly:
+
+| field        | allowed values                                           |
+| -----        | --------------                                           |
+| second       | 0-59                                                     |
+| minute       | 0-59                                                     |
+| hour         | 0-23                                                     |
+| day of month | 1-31 L W                                                 |
+| month        | 1-12 (or names)                                          |
+| day of week  | 0-7 (0 or 7 is Sun, or use names) W 1L 2L 3L 4L 5L 6L 7L |
+
+For more details on supported formats, consult
+[clj-cron-parse's documentation](https://github.com/shmish111/clj-cron-parse/blob/master/src/clj_cron_parse/core.clj#L296-L347).
 
 Each of `define-worker`, `define-recurring`, and `define-cron` creates a regular
 Clojure function of the same name.
