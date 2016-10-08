@@ -87,7 +87,7 @@
         tag (rand-int 100)]
     (testing "new job"
       (register nm (fn [] tag))
-      (schedule-cron "0 0 0 * * *" nm)
+      (schedule-cron "0 0 0 * * *" nil nm)
       (let [cf (get (registered-workers) nm)
             rec1 (get (engine/recurring-map) nm)]
         (is (= tag (cf)))
@@ -96,7 +96,7 @@
         (is (= "0 0 0 * * *" (:cronspec rec1)))))
     (testing "new cronspec"
       (register nm (fn [] (inc tag)))
-      (schedule-cron "0 1 2 * * *" nm)
+      (schedule-cron "0 1 2 * * *" nil nm)
       (let [cf (get (registered-workers) nm)
             rec2 (get (engine/recurring-map) nm)]
         (is (= (inc tag) (cf)))
@@ -104,7 +104,7 @@
         (is (= "0 1 2 * * *" (:cronspec rec2)))
         (testing "same cronspec"
           (register nm (fn [] (+ tag 2)))
-          (schedule-cron "0 1 2 * * *" nm)
+          (schedule-cron "0 1 2 * * *" nil nm)
           (let [cf (get (registered-workers) nm)
                 rec3 (get (engine/recurring-map) nm)]
             (is (= (+ tag 2) (cf)))
@@ -120,20 +120,23 @@
               (fn [name msec]
                 (swap! recurring-spy #(conj % [:recurring name msec])))
               backtick.engine/recurring-add-cronspec
-              (fn [name cronspec]
-                (swap! recurring-spy #(conj % [:cron name cronspec])))]
+              (fn [name cronspec timezone]
+                (swap! recurring-spy #(conj % [:cron name cronspec timezone])))]
 
-(define-worker foo [x]
-  (+ x 7))
+  (define-worker foo [x]
+    (+ x 7))
 
-(define-recurring bar 12345 []
-  (+ 1 1)
-  :bar-result)
+  (define-recurring bar 12345 []
+    (+ 1 1)
+    :bar-result)
 
-(define-cron baz "0 0 1,3,5 * * *" []
-  (+ 2 2)
-  :baz-result)
-)
+  (define-cron baz "0 0 1,3,5 * * *" []
+    (+ 2 2)
+    :baz-result)
+
+  (define-cron quux ["0 0 1,3,5 * * *" "America/Los_Angeles"] []
+    (+ 3 3)
+    :quux-result))
 
 (deftest define-macros-test
   (testing "functions are properly callable"
@@ -144,10 +147,15 @@
     (let [reg (-> (registered-workers)
                   (select-keys ["backtick.test.core-test/foo"
                                 "backtick.test.core-test/bar"
-                                "backtick.test.core-test/baz"]))]
-      (is (= 3 (count (keys reg))))
+                                "backtick.test.core-test/baz"
+                                "backtick.test.core-test/quux"]))]
+      (is (= 4 (count (keys reg))))
       (is (every? ifn? (vals reg)))))
   (testing "jobs scheduled"
     (is (= [[:recurring "backtick.test.core-test/bar" 12345]
-            [:cron "backtick.test.core-test/baz" "0 0 1,3,5 * * *"]]
+            [:cron "backtick.test.core-test/baz" "0 0 1,3,5 * * *" nil]
+            [:cron
+             "backtick.test.core-test/quux"
+             "0 0 1,3,5 * * *"
+             "America/Los_Angeles"]]
            @recurring-spy))))

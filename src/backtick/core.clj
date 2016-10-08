@@ -35,13 +35,13 @@
 
 (defn schedule-cron
   "Schedule a job to be run on the Backtick queue recurring according
-   to a Cron-style schedule specification ('cronspec'). Worker can be
-   either the worker's registered name or a reference to the worker
-   function itself."
-  [cronspec worker & args]
+   to a Cron-style schedule specification ('cronspec') and timezone.
+   Worker can be either the worker's registered name or a reference to
+   the worker function itself."
+  [cronspec timezone worker & args]
   (assert (empty? args) "Cron jobs may not take arguments.")
   (when-let [name (resolve-worker->name worker)]
-    (engine/recurring-add-cronspec name cronspec)))
+    (engine/recurring-add-cronspec name cronspec timezone)))
 
 ;;;
 ;;; Helpers
@@ -54,28 +54,27 @@
        (defn ~@function-definition)
        (register ~str-nm ~symbol-name))))
 
-(defn ^:private define-recurring* [schedulef name intv-or-cs args body]
-  (assert (= args []) "Recurring functions may not take arguments.")
-  (let [symbol-name name  ; avoid shadowing built-in
-        str-nm (str *ns* "/" symbol-name)]
-    `(do
-       (defn ~symbol-name ~args ~@body)
-       (register ~str-nm ~symbol-name)
-       (~schedulef ~intv-or-cs ~symbol-name))))
+(defn ^:private register-worker [symbol-name body]
+  `((defn ~symbol-name [] ~@body)
+    (register ~(str *ns* "/" symbol-name) ~symbol-name)))
 
 (defmacro define-recurring [name interval-ms args & body]
-  (define-recurring* 'backtick.core/schedule-recurring
-                     name
-                     interval-ms
-                     args
-                     body))
+  (assert (= args []) "Recurring workers may not take arguments.")
+  `(do
+     ~@(register-worker name body)
+     (schedule-recurring ~interval-ms ~name)))
 
-(defmacro define-cron [name cronspec args & body]
-  (define-recurring* 'backtick.core/schedule-cron
-                     name
-                     cronspec
-                     args
-                     body))
+(defmacro define-cron
+  "Cronspec-timezone should be either a cronspec string,
+   or a vector of a cronspec string and a timezone string."
+  [name cronspec-timezone args & body]
+  (assert (= args []) "Cron workers may not take arguments.")
+  (let [[cs tz] (if (string? cronspec-timezone)
+                  [cronspec-timezone]
+                  cronspec-timezone)]
+    `(do
+       ~@(register-worker name body)
+       (schedule-cron ~cs ~tz ~name))))
 
 ;;;
 ;;; Cleaners

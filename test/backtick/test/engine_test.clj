@@ -37,18 +37,33 @@
 (deftest recurring-add-cronspec-test
   (let [upsert-spy (atom nil)
         delete-spy (atom nil)]
-    (with-redefs [backtick.db/recurring-upsert-interval
-                  #(reset! upsert-spy [(:interval %) (:cronspec %)])
+    (with-redefs [t/now (constantly (t/date-time 2016 10 11 16 34))
+                  backtick.db/recurring-upsert-interval
+                  #(reset! upsert-spy [(:interval %)
+                                       (:cronspec %)
+                                       (:timezone %)
+                                       (:next %)])
                   backtick.db/recurring-delete!
                   #(reset! delete-spy (:name %))
                   backtick.conf/master-cf {:recurring-resolution-ms 49}]
       (testing "invalid cronspec"
         (is (thrown? Exception
-                     (engine/recurring-add-cronspec "foo" "xxxxx")))
+                     (engine/recurring-add-cronspec "foo" "xxxxx" nil)))
         (is (nil? @upsert-spy)))
-      (testing "cronspec ok"
-        (engine/recurring-add-cronspec "foo" "0 0 * * * *")
-        (is (= @upsert-spy [nil "0 0 * * * *"]))))))
+      (testing "cronspec default"
+        (engine/recurring-add-cronspec "foo" "0 0 3,15 * * *" nil)
+        (is (= @upsert-spy [nil
+                            "0 0 3,15 * * *"
+                            nil
+                            (tc/to-sql-time (t/date-time 2016 10 12 3))])))
+      (testing "cronspec custom"
+        (engine/recurring-add-cronspec "foo"
+                                       "0 0 3,15 * * *"
+                                       "America/Los_Angeles")
+        (is (= @upsert-spy [nil
+                            "0 0 3,15 * * *"
+                            "America/Los_Angeles"
+                            (tc/to-sql-time (t/date-time 2016 10 11 22))]))))))
 
 (deftest add-test
   (let [spy (atom {})
