@@ -23,8 +23,11 @@
         (str u "?_ignore=_ignore"))))
 
 (def spec
-  (pool/make-datasource-spec
-   {:connection-uri (format-jdbc-url (:db-url master-cf))}))
+  (let [dburl (:db-url master-cf)]
+    (when (nil? dburl)
+      (throw (Exception. "Database URL is not set! Aborting.")))
+    (pool/make-datasource-spec
+     {:connection-uri (format-jdbc-url dburl)})))
 
 (defqueries "sql/backtick.sql"
   {:connection spec})

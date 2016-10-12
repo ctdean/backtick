@@ -64,10 +64,18 @@
        (~schedulef ~intv-or-cs ~symbol-name))))
 
 (defmacro define-recurring [name interval-ms args & body]
-  (define-recurring* schedule-recurring name interval-ms args body))
+  (define-recurring* 'backtick.core/schedule-recurring
+                     name
+                     interval-ms
+                     args
+                     body))
 
 (defmacro define-cron [name cronspec args & body]
-  (define-recurring* schedule-cron name cronspec args body))
+  (define-recurring* 'backtick.core/schedule-cron
+                     name
+                     cronspec
+                     args
+                     body))
 
 ;;;
 ;;; Cleaners

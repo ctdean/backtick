@@ -109,3 +109,45 @@
                 rec3 (get (engine/recurring-map) nm)]
             (is (= (+ tag 2) (cf)))
             (is (= rec2 rec3))))))))
+
+;;
+;; Test Macros
+;;
+
+(def recurring-spy (atom []))
+
+(with-redefs [backtick.engine/recurring-add
+              (fn [name msec]
+                (swap! recurring-spy #(conj % [:recurring name msec])))
+              backtick.engine/recurring-add-cronspec
+              (fn [name cronspec]
+                (swap! recurring-spy #(conj % [:cron name cronspec])))]
+
+(define-worker foo [x]
+  (+ x 7))
+
+(define-recurring bar 12345 []
+  (+ 1 1)
+  :bar-result)
+
+(define-cron baz "0 0 1,3,5 * * *" []
+  (+ 2 2)
+  :baz-result)
+)
+
+(deftest define-macros-test
+  (testing "functions are properly callable"
+    (is (= 10 (foo 3)))
+    (is (= :bar-result (bar)))
+    (is (= :baz-result (baz))))
+  (testing "workers registered"
+    (let [reg (-> (registered-workers)
+                  (select-keys ["backtick.test.core-test/foo"
+                                "backtick.test.core-test/bar"
+                                "backtick.test.core-test/baz"]))]
+      (is (= 3 (count (keys reg))))
+      (is (every? ifn? (vals reg)))))
+  (testing "jobs scheduled"
+    (is (= [[:recurring "backtick.test.core-test/bar" 12345]
+            [:cron "backtick.test.core-test/baz" "0 0 1,3,5 * * *"]]
+           @recurring-spy))))
