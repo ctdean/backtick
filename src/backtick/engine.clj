@@ -13,8 +13,8 @@
    [clojure.tools.logging :as log])
   (:import java.util.concurrent.Executors))
 
-(defn- cron-next-date [now cronspec]
-  (let [next (cron/next-date now cronspec)]
+(defn- cron-next-date [now cronspec tz]
+  (let [next (cron/next-date now cronspec tz)]
     (if (nil? next)
       (throw (Exception. (format "Failed to parse cronspec: '%s'" cronspec)))
       next)))
@@ -22,20 +22,21 @@
 (defn- recurring-next
   "Calculates a job's next targeted run time based on
    its interval or cronspec."
-  [now interval cronspec]
+  [now interval cronspec tz]
   (if (nil? interval)
-    (cron-next-date now cronspec)
+    (cron-next-date now cronspec tz)
     (t/plus now (t/millis interval))))
 
-(defn- recurring-add* [name enabled? interval cronspec]
+(defn- recurring-add* [name enabled? interval cronspec tz]
   (let [real-interval (when (not (nil? interval))
                         (int (max (:recurring-resolution-ms master-cf)
                                   interval)))
-        next (to-sql-time (recurring-next (t/now) interval cronspec))]
+        next (to-sql-time (recurring-next (t/now) interval cronspec tz))]
     (if enabled?
       (db/recurring-upsert-interval {:name name
                                      :interval real-interval
                                      :cronspec cronspec
+                                     :timezone tz
                                      :next next})
       ;; I know it's strange to delete a job in a function called "add",
       ;; but this ensures that a newly disabled recurring job's old
@@ -49,13 +50,13 @@
   [name interval]
   (assert (and (integer? interval) (<= 0 interval))
           "interval must be a non-negative integer")
-  (recurring-add* name (not= 0 interval) interval nil))
+  (recurring-add* name (not= 0 interval) interval nil nil))
 
 (defn recurring-add-cronspec
   "Add a recurring job calculating the appropriate run interval
-   based on a cronspec."
-  [name cronspec]
-  (recurring-add* name true nil cronspec))
+   based on a cronspec and timezone."
+  [name cronspec timezone]
+  (recurring-add* name true nil cronspec timezone))
 
 (defn recurring-map
   "All the recurring jobs as a map."
@@ -165,7 +166,8 @@
             (pop-recurring-aux))
           (let [next (to-sql-time (recurring-next (to-date-time (:next payload))
                                                   (:interval payload)
-                                                  (:cronspec payload)))
+                                                  (:cronspec payload)
+                                                  (:timezone payload)))
                 inserted (db/queue-insert<! {:name (:name payload)
                                              :state "running"
                                              :priority (to-sql-time (t/now))
