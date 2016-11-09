@@ -27,7 +27,8 @@
     (when (nil? dburl)
       (throw (Exception. "Database URL is not set! Aborting.")))
     (pool/make-datasource-spec
-     {:connection-uri (format-jdbc-url dburl)})))
+     {:connection-uri (format-jdbc-url dburl)
+      :initial-pool-size 3})))
 
 (defqueries "sql/backtick.sql"
   {:connection spec})
