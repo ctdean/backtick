@@ -5,30 +5,33 @@
    [clj-time.coerce :refer [to-sql-time]]
    [clj-time.core :as time]
    [clojure.string :as string]
-   [jdbc.pool.c3p0 :as pool]
-   [yesql.core :refer [defqueries]])
+   [common.db.util :refer [format-jdbc-url]]
+   [hugsql.core :as hugsql]
+   [jdbc.pool.c3p0 :as pool])
   (:import (java.util.concurrent Executors TimeUnit)))
 
-;;;
-;;; config
-;;;
+(def default-spec
+  {:min-pool-size     3
+   :max-pool-size     15
+   :initial-pool-size 3})
 
-;; Convert a Heroku jdbc URL
-(defn- format-jdbc-url [url]
-  (let [u (string/replace url
-                          #"^postgres\w*://([^:]+):([^:]+)@(.*)"
-                          "jdbc:postgresql://$3?user=$1&password=$2")]
-    (if (re-find #"[?]" u)
-        u
-        (str u "?_ignore=_ignore"))))
-
-(def spec
+(def datasource
   (let [dburl (:db-url master-cf)]
     (when (nil? dburl)
       (throw (Exception. "Database URL is not set! Aborting.")))
     (pool/make-datasource-spec
-     {:connection-uri (format-jdbc-url dburl)
-      :initial-pool-size 3})))
+     (merge default-spec
+            {:connection-uri (format-jdbc-url dburl)}))))
 
-(defqueries "sql/backtick.sql"
-  {:connection spec})
+(defn define-hug-sql-with-connection [connection filename]
+  (doseq [[id {f :fn {doc :doc} :meta}] (hugsql/map-of-db-fns filename)]
+    (intern *ns*
+            (with-meta (symbol (name id)) {:doc doc})
+            (fn
+              ([] (f connection {}))
+              ([params] (f connection params))
+              ([conn params] (f conn params))
+              ([conn params opts & command-opts]
+               (apply f conn params opts command-opts))))))
+
+(define-hug-sql-with-connection datasource "sql/backtick.sql")

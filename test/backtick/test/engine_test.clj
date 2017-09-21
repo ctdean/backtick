@@ -69,7 +69,7 @@
   (let [spy (atom {})
         now (t/now)
         run-at (t/plus now (t/hours 1))]
-    (with-redefs [backtick.db/queue-insert<! #(reset! spy %)]
+    (with-redefs [backtick.db/queue-insert! #(reset! spy %)]
       (engine/add run-at "foo" {:bar "baz" :quux 123 :flim :flam}))
     (is (= (dissoc @spy :priority)
            {:name "foo"

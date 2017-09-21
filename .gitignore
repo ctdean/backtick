@@ -1,6 +1,7 @@
 *.class
 *.jar
 /.lein-*
+/.nrepl-history
 /.nrepl-port
 /app.log
 /checkouts

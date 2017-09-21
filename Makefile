@@ -1,6 +1,6 @@
 #
 # Backtick Makefile
-# 
+#
 
 DATABASE?=backtick
 
@@ -22,24 +22,18 @@ drop:
 
 migrate:
 	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)?user=postgres" \
-	    lein migrate
+	    boot migrate
 	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)_test?user=postgres" \
-	    lein migrate
-
-rollback:
-	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)?user=postgres" \
-	    lein rollback
-	DATABASE_URL="jdbc:postgresql://localhost:5432/$(DATABASE)_test?user=postgres" \
-	    lein rollback
+	    boot migrate
 
 # Nuke the existing databases and recreate
 rebuild: drop init migrate
 
 test:
-	lein test
+	CONF_ENV=test boot alt-test
 
 # Run test refresh with the correct profile and injections.
 test_refresh:
-	lein with-profile +test trampoline test-refresh
+	CONF_ENV=test boot watch alt-test
 
 .PHONY: test

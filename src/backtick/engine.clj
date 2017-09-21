@@ -69,11 +69,11 @@
   "Add a job to the queue"
   [time name data]
   (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
-  (db/queue-insert<! {:name name
-                      :priority (when time (to-sql-time time))
-                      :state "queued"
-                      :tries 0
-                      :data (prn-str data)}))
+  (db/queue-insert! {:name name
+                     :priority (when time (to-sql-time time))
+                     :state "queued"
+                     :tries 0
+                     :data (prn-str data)}))
 
 (def ^:private factory-counter (atom 0))
 
@@ -168,7 +168,7 @@
                                                   (:interval payload)
                                                   (:cronspec payload)
                                                   (:timezone payload)))
-                inserted (db/queue-insert<! {:name (:name payload)
+                inserted (db/queue-insert! {:name (:name payload)
                                              :state "running"
                                              :priority (to-sql-time (t/now))
                                              :tries 1

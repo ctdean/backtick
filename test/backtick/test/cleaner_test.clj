@@ -12,7 +12,8 @@
 (def prev2 (tc/to-sql-time (t/minus (t/now) (t/days 8))))
 
 (def backtick-queue-cols
-  [:id :name :priority :state :tries :data :started_at :finished_at :created_at :updated_at])
+  [:id :name :priority :state :tries :data
+   :started_at :finished_at :created_at :updated_at])
 
 (def backtick-queue-rows
   [[300 "j0" prev2 "done" 1 "[]\n" prev2 prev2 prev2 prev2]
@@ -23,21 +24,24 @@
    [305 "j5" prev2 "canceled" 0 "[]\n" prev2 prev2 prev2 prev2]])
 
 (defn drain-queue []
-  (jdbc/delete! db/spec :backtick_queue []))
+  (jdbc/delete! db/datasource :backtick_queue []))
 
 (defn db-fixtures [f]
   (drain-queue)
-  (jdbc/insert-multi! db/spec :backtick_queue backtick-queue-cols backtick-queue-rows)
+  (jdbc/insert-multi! db/datasource
+                      :backtick_queue
+                      backtick-queue-cols
+                      backtick-queue-rows)
   (f)
   (drain-queue))
 
 (use-fixtures :each db-fixtures)
 
 (deftest revive-one-job-test
-  (let [[before] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")
+  (let [[before] (jdbc/query db/datasource "SELECT * FROM backtick_queue WHERE id = 304")
         now (t/now)]
     (cleaner/revive-one-job 304)
-    (let [[after] (jdbc/query db/spec "SELECT * FROM backtick_queue WHERE id = 304")]
+    (let [[after] (jdbc/query db/datasource "SELECT * FROM backtick_queue WHERE id = 304")]
       (is (= 304 (:id before) (:id after)))
       (is (= "running" (:state before)))
       (is (= "queued" (:state after)))
@@ -49,7 +53,7 @@
 (deftest revive-test
   (cleaner/revive)
   (let [[j1 j2 j3] (jdbc/query
-                    db/spec
+                    db/datasource
                     "SELECT * FROM backtick_queue WHERE id in (301, 302, 303) ORDER BY id ASC")]
     ;; j1
     (is (= (:state j1) "queued"))
@@ -68,6 +72,6 @@
 (deftest remove-old-test
   (cleaner/remove-old)
   (is (= (range 301 305)
-         (->> (jdbc/query db/spec "SELECT * FROM backtick_queue")
+         (->> (jdbc/query db/datasource "SELECT * FROM backtick_queue")
               (map :id)
               sort))))
