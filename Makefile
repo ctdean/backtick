@@ -9,6 +9,9 @@ all: run
 run:
 	lein trampoline run
 
+install:
+	boot pom jar install
+
 # Create the tables
 init:
 	- createuser -s postgres -h localhost

@@ -4,7 +4,7 @@
 ;;;; Chris Dean
 
 (def project 'ctdean/backtick)
-(def version "1.1.0")
+(def version "1.2.0")
 
 (set-env!
  :source-paths #{"test" "src"}
@@ -37,21 +37,14 @@
 (deftask run-repl
   "Run the project with an interactive repl."
   []
-  (require 'app.main)
-  (comp
-   (repl :init-ns 'app.main)
-   (with-pass-thru _
-     ((resolve 'app.main/-main)))))
+  (repl))
 
 (deftask run-cider
   "Run the project with a cider repl."
   []
-  (require 'app.main)
   (comp
    (cider)
    (repl :server true)
-   (with-pass-thru _
-     ((resolve 'app.main/-main)))
    (wait)))
 
 (deftask deploy

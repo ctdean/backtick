@@ -6,6 +6,7 @@
    [clj-time.core :as time]
    [clojure.string :as string]
    [common.db.util :refer [format-jdbc-url]]
+   [hugsql.adapter.clojure-java-jdbc :as adp]
    [hugsql.core :as hugsql]
    [jdbc.pool.c3p0 :as pool])
   (:import (java.util.concurrent Executors TimeUnit)))
@@ -24,7 +25,10 @@
             {:connection-uri (format-jdbc-url dburl)}))))
 
 (defn define-hug-sql-with-connection [connection filename]
-  (doseq [[id {f :fn {doc :doc} :meta}] (hugsql/map-of-db-fns filename)]
+  (doseq [[id {f :fn {doc :doc} :meta}]
+          (hugsql/map-of-db-fns filename
+                                {:adapter (adp/hugsql-adapter-clojure-java-jdbc)}
+                                )]
     (intern *ns*
             (with-meta (symbol (name id)) {:doc doc})
             (fn

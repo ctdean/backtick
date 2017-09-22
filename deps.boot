@@ -10,7 +10,7 @@
   [cider/cider-nrepl "0.14.0" :scope "test"]
   [clojure.jdbc/clojure.jdbc-c3p0 "0.3.2" :exclusions [org.clojure/clojure]]
   [com.carouselapps/to-jdbc-uri "0.5.0" :exclusions [org.clojure/clojure]]
-  [com.layerware/hugsql "0.4.7" :exclusions [org.clojure/clojure]]
+  [com.layerware/hugsql "0.4.6" :exclusions [org.clojure/clojure]]
   [conf "0.10.0" :exclusions [org.clojure/clojure]]
   [metosin/boot-alt-test "0.3.2" :scope "test"]
   [org.clojure/core.async "0.3.443" :exclusions [org.clojure/clojure]]
