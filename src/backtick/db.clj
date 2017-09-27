@@ -27,8 +27,7 @@
 (defn define-hug-sql-with-connection [connection filename]
   (doseq [[id {f :fn {doc :doc} :meta}]
           (hugsql/map-of-db-fns filename
-                                {:adapter (adp/hugsql-adapter-clojure-java-jdbc)}
-                                )]
+                                {:adapter (adp/hugsql-adapter-clojure-java-jdbc)})]
     (intern *ns*
             (with-meta (symbol (name id)) {:doc doc})
             (fn
@@ -38,4 +37,5 @@
               ([conn params opts & command-opts]
                (apply f conn params opts command-opts))))))
 
+(hugsql.core/set-adapter! (adp/hugsql-adapter-clojure-java-jdbc))
 (define-hug-sql-with-connection datasource "sql/backtick.sql")

@@ -70,7 +70,7 @@
   [time name data]
   (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
   (db/queue-insert! {:name name
-                     :priority (when time (to-sql-time time))
+                     :priority (to-sql-time (or time (t/now)))
                      :state "queued"
                      :tries 0
                      :data (prn-str data)}))

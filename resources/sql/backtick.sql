@@ -16,12 +16,14 @@ from (
 where  bq.id = sub.id
 returning bq.*;
 
--- :name queue-insert! :insert
+-- :name queue-insert! :returning-execute :1
 -- :doc Insert a new job element
 insert into backtick_queue
   (name, priority, state, tries, data, created_at, updated_at)
 values
-  (:name, coalesce(:priority, now()), :state, :tries, :data, now(), now());
+  (:name, coalesce(:priority, now()), :state, :tries, :data, now(), now())
+returning
+  id, name, priority, state, tries, data, created_at, updated_at;
 
 -- :name queue-finish! :! :n
 -- :doc Mark a job as finished
