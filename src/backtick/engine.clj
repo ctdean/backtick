@@ -33,11 +33,11 @@
                                   interval)))
         next (to-sql-time (recurring-next (t/now) interval cronspec tz))]
     (if enabled?
-      (db/recurring-upsert-interval {:name name
-                                     :interval real-interval
-                                     :cronspec cronspec
-                                     :timezone tz
-                                     :next next})
+        (db/recurring-upsert-interval {:name name
+                                       :interval real-interval
+                                       :cronspec cronspec
+                                       :timezone tz
+                                       :next next})
       ;; I know it's strange to delete a job in a function called "add",
       ;; but this ensures that a newly disabled recurring job's old
       ;; database entry is disabled to match.

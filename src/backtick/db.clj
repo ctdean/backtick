@@ -24,6 +24,8 @@
      (merge default-spec
             {:connection-uri (format-jdbc-url dburl)}))))
 
+(def ^:dynamic *transaction* nil)
+
 (defn define-hug-sql-with-connection [connection filename]
   (doseq [[id {f :fn {doc :doc} :meta}]
           (hugsql/map-of-db-fns filename
@@ -31,8 +33,8 @@
     (intern *ns*
             (with-meta (symbol (name id)) {:doc doc})
             (fn
-              ([] (f connection {}))
-              ([params] (f connection params))
+              ([] (f (or *transaction* connection) {}))
+              ([params] (f (or *transaction* connection) params))
               ([conn params] (f conn params))
               ([conn params opts & command-opts]
                (apply f conn params opts command-opts))))))
