@@ -18,5 +18,5 @@
   [org.clojure/test.check "0.9.0" :exclusions [org.clojure/clojure]]
   [org.clojure/tools.logging "0.4.0" :exclusions [org.clojure/clojure]]
   [org.postgresql/postgresql "9.4.1211"]
-  [ronin/common "1.2.1"]
+  [treasuryprime/common "1.3.0"]
   ]

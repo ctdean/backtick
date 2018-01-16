@@ -4,7 +4,7 @@
 ;;;; Chris Dean
 
 (def project 'ctdean/backtick)
-(def version "1.4.0")
+(def version "1.4.1")
 
 (set-env!
  :source-paths #{"test" "src"}

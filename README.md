@@ -29,6 +29,10 @@ Backtick will read `:bt-database-url` or failing that will use the
 }
 ```
 
+### Environment
+
+Use must install the libsodium shared library. On a OS X that is `brew install libsodium`
+
 ### Jobs
 
 You configure jobs using the `define-worker` macro:
