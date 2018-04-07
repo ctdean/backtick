@@ -81,11 +81,11 @@
 ;;;
 
 (define-recurring revive-killed-jobs (:revive-check-ms master-cf) []
-  (log/info "Running revive-killed-jobs")
+  (log/debug "Running revive-killed-jobs")
   (cleaner/revive))
 
 (define-recurring remove-old-jobs (:remove-check-ms master-cf) []
-  (log/info "Running remove-old-jobs")
+  (log/debug "Running remove-old-jobs")
   (cleaner/remove-old))
 
 ;;;
