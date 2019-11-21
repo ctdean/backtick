@@ -67,13 +67,15 @@
 
 (defn add
   "Add a job to the queue"
-  [time name data]
-  (assert (or (nil? data) (seq data)) "Job data must be a seq or nil.")
-  (db/queue-insert! {:name name
-                     :priority (to-sql-time (or time (t/now)))
-                     :state "queued"
-                     :tries 0
-                     :data (prn-str data)}))
+  [& {:keys [name time args queue-name]}]
+  (assert (or (nil? args) (seq args)) "Job data must be a seq or nil.")
+  (assert queue-name)
+  (db/queue-insert! {:name       name
+                     :priority   (to-sql-time (or time (t/now)))
+                     :state      "queued"
+                     :tries      0
+                     :queue_name queue-name
+                     :data       (prn-str args)}))
 
 (def ^:private factory-counter (atom 0))
 
@@ -117,7 +119,9 @@
           :ping (do
                   (log/debugf "runner %s ready" r)
                   (recur))
+
           :stop (log/debugf "runner %s stop" r)
+
           (let [done-ch (chan 1)
                 worker (submit-worker pool done-ch msg)
                 [done? port] (alts! [done-ch (timeout (:timeout-ms master-cf))])]
@@ -148,14 +152,14 @@
           nil)
         (throw e)))))
 
-(defn- pop-payload []
-  (some-> (db/queue-pop)
+(defn- pop-payload [queue-name]
+  (some-> (db/queue-pop {:queue_name queue-name})
           first
           (update :data edn-safe-read-string)))
 
 ;; Not fault tolerant
 (defn- pop-recurring-aux []
-  (let [now (t/now)
+  (let [now    (t/now)
         window (to-sql-time (t/plus now (t/millis (:recurring-window-ms master-cf))))]
     (when-let [payload (first (db/recurring-next {:now (to-sql-time now) :next window}))]
       (if (not (resolve-worker->fn (:name payload)))
@@ -164,15 +168,16 @@
                        (:name payload))
             (db/recurring-delete! payload)
             (pop-recurring-aux))
-          (let [next (to-sql-time (recurring-next (to-date-time (:next payload))
-                                                  (:interval payload)
-                                                  (:cronspec payload)
-                                                  (:timezone payload)))
-                inserted (db/queue-insert! {:name (:name payload)
-                                             :state "running"
-                                             :priority (to-sql-time (t/now))
-                                             :tries 1
-                                             :data (prn-str [])})]
+          (let [next     (to-sql-time (recurring-next (to-date-time (:next payload))
+                                                      (:interval payload)
+                                                      (:cronspec payload)
+                                                      (:timezone payload)))
+                inserted (db/queue-insert! {:name       (:name payload)
+                                            :state      "running"
+                                            :queue_name "default"
+                                            :priority   (to-sql-time (t/now))
+                                            :tries      1
+                                            :data       (prn-str [])})]
             (db/recurring-update-next! (-> (select-keys payload [:id])
                                            (assoc :next next)))
             (assoc payload :id (:id inserted)))))))
@@ -184,30 +189,30 @@
       (log/warn e "Error retrieving recurring job.")
       nil)))
 
-(defn- pop-queue-aux []
-  (or (when (> (System/currentTimeMillis)
-               (+ @recurring-checked (:recurring-ms master-cf)))
-        (if-let [payload (pop-recurring)]
-          payload
-          (do
-            (reset! recurring-checked (System/currentTimeMillis))
-            nil)))
-      (pop-payload)))
+(defn- pop-queue-aux [queue-name]
+  (or (when (and (= queue-name "default")
+                 (> (System/currentTimeMillis)
+                    (+ @recurring-checked (:recurring-ms master-cf))))
+        (or (pop-recurring)
+            (do
+              (reset! recurring-checked (System/currentTimeMillis))
+              nil)))
+      (pop-payload queue-name)))
 
-(defn- pop-queue []
+(defn- pop-queue [queue-name]
   (try
-    (pop-queue-aux)
+    (pop-queue-aux queue-name)
     (catch Throwable e
-      (log/warn e "Erron retrieving queue entry")
+      (log/warnf e "Error retrieving queue entry %s" queue-name)
       nil)))
 
 (defn- process-one-queue
   "Find available job runner"
-  [job-ch keep-running-queue?]
+  [queue-name job-ch keep-running-queue?]
   (when-let [sent? (first (alts!! [[job-ch :ping] (timeout 1000)]))]
     (loop []
       (when @keep-running-queue?
-        (let [payload (pop-queue)]    ; Pop from the queue
+        (let [payload (pop-queue queue-name)] ; Pop from the queue
           (if payload                 ; Send the job to be processed
               (>!! job-ch (select-keys payload [:data :name :id]))
               (do                     ; Sleep if queue is empty
@@ -216,23 +221,23 @@
 
 (defn- run-queue
   "Run the master work queue.  This function never returns in normal operation."
-  [pool-size job-ch keep-running-queue?]
+  [pool-size queue-name job-ch keep-running-queue?]
   (try
     (while @keep-running-queue?
       (log/debug "run-queue loop")
-      (process-one-queue job-ch keep-running-queue?))
+      (process-one-queue queue-name job-ch keep-running-queue?))
     (finally
       (dotimes [_ pool-size]
         (>!! job-ch :stop)))))
 
-(defn run [pool-size]
+(defn run [pool-size queue-name]
   (let [keep-running-queue? (atom true)
         t (future
             (log/infof "Backlog starting")
             (let [pool (Executors/newFixedThreadPool pool-size (make-thread-factory))
                   job-ch (chan)]
               (start-runners pool pool-size job-ch)
-              (run-queue pool-size job-ch keep-running-queue?)
+              (run-queue pool-size queue-name job-ch keep-running-queue?)
               (.shutdown pool)
               (log/infof "Shutdown complete")))]
     (fn []

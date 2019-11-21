@@ -66,18 +66,25 @@
                             (tc/to-sql-time (t/date-time 2016 10 11 22))]))))))
 
 (deftest add-test
-  (let [spy (atom {})
-        now (t/now)
+  (let [spy    (atom {})
+        now    (t/now)
         run-at (t/plus now (t/hours 1))]
     (with-redefs [backtick.db/queue-insert! #(reset! spy %)]
-      (engine/add run-at "foo" {:bar "baz" :quux 123 :flim :flam}))
+      (engine/add :time   run-at
+                  :name "foo"
+                  :queue-name "default"
+                  :args   {:bar "baz" :quux 123 :flim :flam}))
     (is (= (dissoc @spy :priority)
-           {:name "foo"
+           {:name  "foo"
             :state "queued"
+            :queue_name "default"
             :tries 0
-            :data "{:bar \"baz\", :quux 123, :flim :flam}\n"}))
+            :data  "{:bar \"baz\", :quux 123, :flim :flam}\n"}))
     (is (= (@spy :priority) (tc/to-sql-time run-at))))
-  (let [inserted (engine/add (t/now) "foo" [1 2 3])]
+  (let [inserted (engine/add :time (t/now)
+                             :name "foo"
+                             :queue-name "default"
+                             :args [1 2 3])]
     (is (= 0 (:tries inserted)))
     (is (nil? (:started_at inserted)))
     (is (> (:id inserted) 0))
@@ -102,9 +109,10 @@
     (is (= (second @foobar-called) [:x :y]))))
 
 (deftest cancel-all-test
-  (dotimes [n 3] (engine/add (t/now) "foo" [n]))
-  (let [job (first (db/queue-pop))]
+  (dotimes [n 3]
+    (engine/add :time (t/now) :name "foo" :queue-name "default" :args [n]))
+  (let [job (first (db/queue-pop {:queue_name "default"}))]
     (is (= "foo" (:name job)))
     (is (= "[0]\n" (:data job))))
   (engine/cancel-all)
-  (is (empty? (db/queue-pop))))
+  (is (empty? (db/queue-pop {:queue_name "default"}))))

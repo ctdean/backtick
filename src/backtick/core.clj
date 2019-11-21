@@ -8,19 +8,26 @@
    [clojure.tools.logging :as log])
   (:gen-class))
 
+(defn schedule*
+  "Schedule a job on the Backtick queue to with all options. Worker can be
+   either the worker's registered name or a reference to the worker function itself."
+  [& {:keys [worker time args queue-name]
+      :or   {queue-name "default"}}]
+  (when-let [name (resolve-worker->name worker)]
+    (engine/add :time time :name name :args args :queue-name queue-name)))
+
 (defn schedule-at
   "Schedule a job on the Backtick queue to be run at the appointed time. Worker can be
    either the worker's registered name or a reference to the worker function itself."
   [time worker & args]
   ;; Implementation detail: A priority of nil means now.
-  (when-let [name (resolve-worker->name worker)]
-    (engine/add time name args)))
+  (schedule* :time time :worker worker :args args))
 
 (defn schedule
   "Schedule a job on the Backtick queue to be run as soon as possible. Worker can be
    either the worker's registered name or a reference to the worker function itself."
   [worker & args]
-  (apply schedule-at nil worker args))
+  (schedule* :worker worker :args args))
 
 (defn schedule-recurring
   "Schedule a job to be run on the Backtick queue on a recurring basis, every
@@ -92,11 +99,10 @@
 ;;; Run the queue on this JVM
 ;;;
 
-(defn start
-  ([]
-   (start (:pool-size master-cf)))
-  ([pool-size]
-   (engine/run pool-size)))
+(defn start [& {:keys [pool-size queue-name]
+                :or {pool-size (:pool-size master-cf)
+                     queue-name "default"}}]
+  (engine/run pool-size queue-name))
 
 (defn -main [& args]
   (log/info "Starting bactick")
