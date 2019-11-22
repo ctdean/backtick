@@ -12,7 +12,6 @@ from (
    order by priority
    limit 1
    for update
-   skip locked
    ) sub
 where
   bq.id = sub.id
