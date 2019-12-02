@@ -11,7 +11,7 @@ from (
    where state = 'queued' and priority <= now() and queue_name = :queue_name
    order by priority
    limit 1
-   for update
+   for update skip locked
    ) sub
 where
   bq.id = sub.id
