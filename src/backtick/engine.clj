@@ -16,16 +16,16 @@
 (defn- cron-next-date [now cronspec tz]
   (let [next (cron/next-date now cronspec tz)]
     (if (nil? next)
-      (throw (Exception. (format "Failed to parse cronspec: '%s'" cronspec)))
-      next)))
+        (throw (Exception. (format "Failed to parse cronspec: '%s'" cronspec)))
+        next)))
 
 (defn- recurring-next
   "Calculates a job's next targeted run time based on
    its interval or cronspec."
   [now interval cronspec tz]
   (if (nil? interval)
-    (cron-next-date now cronspec tz)
-    (t/plus now (t/millis interval))))
+      (cron-next-date now cronspec tz)
+      (t/plus now (t/millis interval))))
 
 (defn- recurring-add* [name enabled? interval cronspec tz]
   (let [real-interval (when (not (nil? interval))
@@ -38,10 +38,10 @@
                                        :cronspec cronspec
                                        :timezone tz
                                        :next next})
-      ;; I know it's strange to delete a job in a function called "add",
-      ;; but this ensures that a newly disabled recurring job's old
-      ;; database entry is disabled to match.
-      (db/recurring-delete! {:name name}))))
+        ;; I know it's strange to delete a job in a function called "add",
+        ;; but this ensures that a newly disabled recurring job's old
+        ;; database entry is disabled to match.
+        (db/recurring-delete! {:name name}))))
 
 (defn recurring-add
   "Add a recurring job to the database. The job is started for the first time
@@ -84,31 +84,33 @@
         name (swap! factory-counter inc)]
     (reify java.util.concurrent.ThreadFactory
       (newThread [_ r]
-        (new Thread r (format "workq-thread-%s-%s"
-                              name
-                              (swap! thread-counter inc)))))))
+                 (new Thread r (format "workq-thread-%s-%s"
+                                       name
+                                       (swap! thread-counter inc)))))))
 
 (def ^:dynamic *job-id* nil)
+(def ^:dynamic *job-payload* nil)
 
 (defn submit-worker [pool ch msg]
   (let [{id :id name :name data :data} msg
         f (resolve-worker->fn name)]
     (log/debugf "Running job %s %s ..." id name)
     (if f
-      (.submit pool (fn [] (try
-                             (binding [*job-id* id]
-                               (apply f data))
-                             (catch Throwable e
-                               (log/warnf e "Unable to run job %s %s" id name)
-                               (cleaner/revive-one-job id))
-                             (finally
-                               (log/debugf "Running job %s %s ... done" id name)
-                               (>!! ch :done)
-                               (log/debugf "Running job %s %s ... done sent" id name)))))
-      (do
-        (log/errorf "No worker %s registered, discarding job %s" name id)
-        (>!! ch :done)
-        nil))))
+        (.submit pool (fn [] (try
+                               (binding [*job-id* id
+                                         *job-payload* msg]
+                                 (apply f data))
+                               (catch Throwable e
+                                 (log/warnf e "Unable to run job %s %s" id name)
+                                 (cleaner/revive-one-job id))
+                               (finally
+                                 (log/debugf "Running job %s %s ... done" id name)
+                                 (>!! ch :done)
+                                 (log/debugf "Running job %s %s ... done sent" id name)))))
+        (do
+          (log/errorf "No worker %s registered, discarding job %s" name id)
+          (>!! ch :done)
+          nil))))
 
 (defn- start-runners [pool pool-size job-ch]
   (log/debugf "start-runners")
@@ -145,12 +147,12 @@
     (edn/read-string s)
     (catch java.lang.RuntimeException e
       (if (= (.getMessage e) "No reader function for tag object")
-        (do
-          (log/warn "Failed to deserialize EDN job data."
-                    "You probably scheduled the job with non-serializable arguments."
-                    "Raw data:" s)
-          nil)
-        (throw e)))))
+          (do
+            (log/warn "Failed to deserialize EDN job data."
+                      "You probably scheduled the job with non-serializable arguments."
+                      "Raw data:" s)
+            nil)
+          (throw e)))))
 
 (defn- pop-payload [queue-name]
   (some-> (db/queue-pop {:queue_name queue-name})
@@ -214,7 +216,7 @@
       (when @keep-running-queue?
         (let [payload (pop-queue queue-name)] ; Pop from the queue
           (if payload                 ; Send the job to be processed
-              (>!! job-ch (select-keys payload [:data :name :id]))
+              (>!! job-ch payload)
               (do                     ; Sleep if queue is empty
                 (Thread/sleep (:poll-ms master-cf))
                 (recur))))))))

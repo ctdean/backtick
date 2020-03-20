@@ -42,3 +42,6 @@ test_refresh:
 	CONF_ENV=test lein test-refresh
 
 .PHONY: test
+
+deploy:
+	lein deploy tprime

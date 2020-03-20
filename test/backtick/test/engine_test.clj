@@ -95,18 +95,23 @@
   (submit [this job]))
 
 (deftest submit-worker-test
-  (let [pool (reify FakeThreadPool
-               (submit [_ job] (job)))
-        ch (chan 1)
-        msg {:id 12345 :name "foobar" :data [:x :y]}
-        foobar-called (atom [])
-        runner (fn [& args] (reset! foobar-called [engine/*job-id* args]))
+  (let [pool     (reify FakeThreadPool
+                   (submit [_ job] (job)))
+        ch       (chan 1)
+        msg      {:id 12345 :name "wtest" :data [:x :y] :tries 10}
+        seen     (atom [])
+        runner   (fn [& args] (reset! seen [{:job-id      engine/*job-id*
+                                             :job-payload engine/*job-payload*
+                                             :args        args}]))
         resolver (fn [_] runner)]
     (thread (with-redefs [registery/resolve-worker->fn resolver]
               (engine/submit-worker pool ch msg)))
     (is (= (<!! ch) :done))
-    (is (first @foobar-called))
-    (is (= (second @foobar-called) [:x :y]))))
+    (is (first @seen))
+    (is (= (first @seen)
+           {:args       [:x :y]
+            :job-id      12345
+            :job-payload {:data [:x :y], :id 12345 :name "wtest" :tries 10}}))))
 
 (deftest cancel-all-test
   (dotimes [n 3]

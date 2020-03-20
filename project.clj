@@ -1,6 +1,7 @@
 (defproject ctdean/backtick
-  "1.5.1"
+  "1.5.2"
   :description "A background job processor"
+  :license :eclipse
   :dependencies
   [
    [cider/cider-nrepl "0.14.0" :scope "test"]
@@ -18,8 +19,11 @@
    [org.postgresql/postgresql "9.4.1211"]
    [treasuryprime/common "1.3.0"]
    ]
-  :plugins [[com.jakemccrary/lein-test-refresh "0.22.0"]]
+  :plugins [[s3-wagon-private "1.3.2"]
+            [com.jakemccrary/lein-test-refresh "0.22.0"]]
   :profiles {:test {:jvm-opts ["-Dconf.env=test"]}}
+  :repositories
+  [["tprime" {:url "s3p://treasuryprime-jars/releases/" :no-auth true}]]
   :test-refresh {:quiet true
                  :changes-only true}
   )
