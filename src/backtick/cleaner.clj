@@ -21,10 +21,10 @@
 
 (defn- time-unit [x]
   (cond
-   (< x 1000) (format "%3.1f %5s" x "ms")
-   (< x (* 60 1000)) (format "%3.1f %5s" (/ x 1000.0) "secs")
-   (< x (* 60 60 1000)) (format "%3.1f %5s" (/ x 60 1000.0) "mins")
-   :else (format "%3.1f %5s" (/ x 60 60 1000.0) "hours")))
+    (< x 1000) (format "%3.1f %5s" x "ms")
+    (< x (* 60 1000)) (format "%3.1f %5s" (/ x 1000.0) "secs")
+    (< x (* 60 60 1000)) (format "%3.1f %5s" (/ x 60 1000.0) "mins")
+    :else (format "%3.1f %5s" (/ x 60 60 1000.0) "hours")))
 
 (defn- dump-revive-range
   "Print the possible revive times.  Useful for debugging."
@@ -49,9 +49,9 @@
      (log/errorf "No id for revive-one-job: %s" id)))
   ([id tries]
    (if (exceeded? tries)
-     (db/queue-abort-job! {:id id})
-     (db/queue-requeue-job! {:id id
-                             :priority (revive-at tries)}))))
+       (db/queue-abort-job! {:id id})
+       (db/queue-requeue-job! {:id id
+                               :priority (revive-at tries)}))))
 
 (defn revive
   "Revive jobs that never finished.  Will be run from a backtick job."
